@@ -1,7 +1,9 @@
 import { createHash } from 'node:crypto'
-import { DatabaseSync } from 'node:sqlite'
+import sqlite from 'node:sqlite'
 import { mkdir, readFile } from 'node:fs/promises'
 import path from 'node:path'
+
+const { DatabaseSync } = sqlite
 
 export const passwordHashPrefix = 'sha256:'
 export const minimumPasswordLength = 6
