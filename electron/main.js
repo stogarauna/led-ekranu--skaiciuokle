@@ -1,4 +1,3 @@
-import { app, BrowserWindow, ipcMain, shell } from 'electron'
 import { copyFile, mkdir, readFile } from 'node:fs/promises'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -14,14 +13,6 @@ import {
 } from './user-store.js'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
-
-app.disableHardwareAcceleration()
-app.commandLine.appendSwitch('disable-gpu')
-app.commandLine.appendSwitch('disable-gpu-compositing')
-app.commandLine.appendSwitch('disable-features', 'CalculateNativeWinOcclusion')
-
-const sessionDataPath = path.join(app.getPath('userData'), 'session-data')
-app.setPath('sessionData', sessionDataPath)
 
 const csvColumns = [
   ['name', 'name'],
@@ -40,7 +31,7 @@ const csvColumns = [
   ['frameWeightKg 1m', 'frameWeightKg1m'],
 ]
 
-function getBundledDataFilePath() {
+function getBundledDataFilePath(app) {
   if (app.isPackaged) {
     return path.join(process.resourcesPath, 'data', 'led-models.csv')
   }
@@ -48,27 +39,27 @@ function getBundledDataFilePath() {
   return path.resolve(__dirname, '../data/led-models.csv')
 }
 
-function getUserDataFilePath() {
+function getUserDataFilePath(app) {
   return path.join(app.getPath('userData'), 'data', 'led-models.csv')
 }
 
-function getLegacyUsersCsvPath() {
+function getLegacyUsersCsvPath(app) {
   return path.join(app.getPath('userData'), 'data', 'users.csv')
 }
 
-function getUsersDatabasePath() {
+function getUsersDatabasePath(app) {
   return path.join(app.getPath('userData'), 'data', 'users.db')
 }
 
-async function ensureDataFile() {
-  const targetPath = getUserDataFilePath()
+async function ensureDataFile(app) {
+  const targetPath = getUserDataFilePath(app)
   await mkdir(path.dirname(targetPath), { recursive: true })
 
   try {
     await readFile(targetPath, 'utf8')
     return targetPath
   } catch {
-    await copyFile(getBundledDataFilePath(), targetPath)
+    await copyFile(getBundledDataFilePath(app), targetPath)
     return targetPath
   }
 }
@@ -101,8 +92,8 @@ function parseCsv(text) {
   })
 }
 
-async function loadLedData() {
-  const dataFilePath = await ensureDataFile()
+async function loadLedData(app) {
+  const dataFilePath = await ensureDataFile(app)
   const csvText = await readFile(dataFilePath, 'utf8')
 
   return {
@@ -119,7 +110,7 @@ function sanitizeUsersForRenderer(users) {
   }))
 }
 
-function createWindow() {
+function createWindow(BrowserWindow) {
   const window = new BrowserWindow({
     width: 1360,
     height: 920,
@@ -145,136 +136,156 @@ function createWindow() {
   window.loadFile(path.resolve(__dirname, '../dist/index.html'))
 }
 
-ipcMain.handle('led-data:load', async () => {
-  return loadLedData()
-})
+async function startElectronDesktop() {
+  const electronModule = await import('electron')
+  const electronExports = 'default' in electronModule ? electronModule.default : electronModule
+  const { app, BrowserWindow, ipcMain, shell } = electronExports
 
-ipcMain.handle('led-data:open-file', async () => {
-  const dataFilePath = await ensureDataFile()
-  const openResult = await shell.openPath(dataFilePath)
+  app.disableHardwareAcceleration()
+  app.commandLine.appendSwitch('disable-gpu')
+  app.commandLine.appendSwitch('disable-gpu-compositing')
+  app.commandLine.appendSwitch('disable-features', 'CalculateNativeWinOcclusion')
 
-  if (openResult) {
-    throw new Error(openResult)
-  }
+  const sessionDataPath = path.join(app.getPath('userData'), 'session-data')
+  app.setPath('sessionData', sessionDataPath)
 
-  return dataFilePath
-})
+  ipcMain.handle('led-data:load', async () => {
+    return loadLedData(app)
+  })
 
-ipcMain.handle('users:list', async () => {
-  const { users, usersFilePath } = await loadUsersFromDatabase(getUsersDatabasePath(), getLegacyUsersCsvPath())
+  ipcMain.handle('led-data:open-file', async () => {
+    const dataFilePath = await ensureDataFile(app)
+    const openResult = await shell.openPath(dataFilePath)
 
-  return {
-    users: sanitizeUsersForRenderer(users),
-    usersFilePath,
-  }
-})
+    if (openResult) {
+      throw new Error(openResult)
+    }
 
-ipcMain.handle('users:login', async (_event, payload) => {
-  const username = normalizeUsername(payload?.username)
-  const password = typeof payload?.password === 'string' ? payload.password : ''
+    return dataFilePath
+  })
 
-  if (!username || !password) {
-    throw new Error('Įveskite vartotojo vardą ir slaptažodį.')
-  }
+  ipcMain.handle('users:list', async () => {
+    const { users, usersFilePath } = await loadUsersFromDatabase(getUsersDatabasePath(app), getLegacyUsersCsvPath(app))
 
-  const { users, usersFilePath } = await loadUsersFromDatabase(getUsersDatabasePath(), getLegacyUsersCsvPath())
-  const matchedUser = users.find((user) => user.username === username)
-
-  if (!matchedUser || !verifyPassword(matchedUser, password)) {
-    throw new Error('Neteisingas vartotojo vardas arba slaptažodis.')
-  }
-
-  return {
-    user: {
-      username: matchedUser.username,
-      passwordHash: '',
-      role: matchedUser.role,
-    },
-    usersFilePath,
-  }
-})
-
-ipcMain.handle('users:create', async (_event, payload) => {
-  const username = normalizeUsername(payload?.username)
-  const password = typeof payload?.password === 'string' ? payload.password : ''
-  const role = isValidRole(payload?.role) ? payload.role : 'user'
-
-  if (!username) {
-    throw new Error('Įveskite vartotojo vardą.')
-  }
-
-  if (password.length < minimumPasswordLength) {
-    throw new Error(`Slaptažodis turi būti bent ${minimumPasswordLength} simbolių.`)
-  }
-
-  const { users } = await loadUsersFromDatabase(getUsersDatabasePath(), getLegacyUsersCsvPath())
-
-  if (users.some((user) => user.username === username)) {
-    throw new Error('Toks vartotojas jau egzistuoja.')
-  }
-
-  const result = await saveUsersToDatabase(
-    getUsersDatabasePath(),
-    [...users, { username, passwordHash: hashPassword(password), role }],
-    getLegacyUsersCsvPath(),
-  )
-
-  return {
-    users: sanitizeUsersForRenderer(result.users),
-    usersFilePath: result.usersFilePath,
-  }
-})
-
-ipcMain.handle('users:delete', async (_event, usernameValue) => {
-  const username = normalizeUsername(usernameValue)
-  const { users } = await loadUsersFromDatabase(getUsersDatabasePath(), getLegacyUsersCsvPath())
-  const targetUser = users.find((user) => user.username === username)
-
-  if (!targetUser) {
-    throw new Error('Nepavyko rasti pasirinkto vartotojo.')
-  }
-
-  const adminCount = users.filter((user) => user.role === 'admin').length
-
-  if (targetUser.role === 'admin' && adminCount <= 1) {
-    throw new Error('Turi likti bent vienas administratorius.')
-  }
-
-  const result = await saveUsersToDatabase(
-    getUsersDatabasePath(),
-    users.filter((user) => user.username !== username),
-    getLegacyUsersCsvPath(),
-  )
-
-  return {
-    users: sanitizeUsersForRenderer(result.users),
-    usersFilePath: result.usersFilePath,
-  }
-})
-
-ipcMain.handle('users:open-file', async () => {
-  const { usersFilePath } = await openUsersDatabase(getUsersDatabasePath(), getLegacyUsersCsvPath())
-  const openResult = await shell.openPath(usersFilePath)
-
-  if (openResult) {
-    throw new Error(openResult)
-  }
-
-  return usersFilePath
-})
-
-app.whenReady().then(() => {
-  createWindow()
-
-  app.on('activate', () => {
-    if (BrowserWindow.getAllWindows().length === 0) {
-      createWindow()
+    return {
+      users: sanitizeUsersForRenderer(users),
+      usersFilePath,
     }
   })
-})
 
-app.on('window-all-closed', () => {
-  if (process.platform !== 'darwin') {
-    app.quit()
-  }
-})
+  ipcMain.handle('users:login', async (_event, payload) => {
+    const username = normalizeUsername(payload?.username)
+    const password = typeof payload?.password === 'string' ? payload.password : ''
+
+    if (!username || !password) {
+      throw new Error('Įveskite vartotojo vardą ir slaptažodį.')
+    }
+
+    const { users, usersFilePath } = await loadUsersFromDatabase(getUsersDatabasePath(app), getLegacyUsersCsvPath(app))
+    const matchedUser = users.find((user) => user.username === username)
+
+    if (!matchedUser || !verifyPassword(matchedUser, password)) {
+      throw new Error('Neteisingas vartotojo vardas arba slaptažodis.')
+    }
+
+    return {
+      user: {
+        username: matchedUser.username,
+        passwordHash: '',
+        role: matchedUser.role,
+      },
+      usersFilePath,
+    }
+  })
+
+  ipcMain.handle('users:create', async (_event, payload) => {
+    const username = normalizeUsername(payload?.username)
+    const password = typeof payload?.password === 'string' ? payload.password : ''
+    const role = isValidRole(payload?.role) ? payload.role : 'user'
+
+    if (!username) {
+      throw new Error('Įveskite vartotojo vardą.')
+    }
+
+    if (password.length < minimumPasswordLength) {
+      throw new Error(`Slaptažodis turi būti bent ${minimumPasswordLength} simbolių.`)
+    }
+
+    const { users } = await loadUsersFromDatabase(getUsersDatabasePath(app), getLegacyUsersCsvPath(app))
+
+    if (users.some((user) => user.username === username)) {
+      throw new Error('Toks vartotojas jau egzistuoja.')
+    }
+
+    const result = await saveUsersToDatabase(
+      getUsersDatabasePath(app),
+      [...users, { username, passwordHash: hashPassword(password), role }],
+      getLegacyUsersCsvPath(app),
+    )
+
+    return {
+      users: sanitizeUsersForRenderer(result.users),
+      usersFilePath: result.usersFilePath,
+    }
+  })
+
+  ipcMain.handle('users:delete', async (_event, usernameValue) => {
+    const username = normalizeUsername(usernameValue)
+    const { users } = await loadUsersFromDatabase(getUsersDatabasePath(app), getLegacyUsersCsvPath(app))
+    const targetUser = users.find((user) => user.username === username)
+
+    if (!targetUser) {
+      throw new Error('Nepavyko rasti pasirinkto vartotojo.')
+    }
+
+    const adminCount = users.filter((user) => user.role === 'admin').length
+
+    if (targetUser.role === 'admin' && adminCount <= 1) {
+      throw new Error('Turi likti bent vienas administratorius.')
+    }
+
+    const result = await saveUsersToDatabase(
+      getUsersDatabasePath(app),
+      users.filter((user) => user.username !== username),
+      getLegacyUsersCsvPath(app),
+    )
+
+    return {
+      users: sanitizeUsersForRenderer(result.users),
+      usersFilePath: result.usersFilePath,
+    }
+  })
+
+  ipcMain.handle('users:open-file', async () => {
+    const { usersFilePath } = await openUsersDatabase(getUsersDatabasePath(app), getLegacyUsersCsvPath(app))
+    const openResult = await shell.openPath(usersFilePath)
+
+    if (openResult) {
+      throw new Error(openResult)
+    }
+
+    return usersFilePath
+  })
+
+  app.whenReady().then(() => {
+    createWindow(BrowserWindow)
+
+    app.on('activate', () => {
+      if (BrowserWindow.getAllWindows().length === 0) {
+        createWindow(BrowserWindow)
+      }
+    })
+  })
+
+  app.on('window-all-closed', () => {
+    if (process.platform !== 'darwin') {
+      app.quit()
+    }
+  })
+}
+
+if (process.versions.electron) {
+  void startElectronDesktop()
+} else {
+  await import('../server/auth-server.js')
+}
