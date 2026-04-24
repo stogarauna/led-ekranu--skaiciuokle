@@ -1,6 +1,17 @@
 import type { CSSProperties } from 'react'
 import { useEffect, useState } from 'react'
 import bundledCsvText from '../data/led-models.csv?raw'
+import {
+  createSharedUser,
+  deleteSharedUser,
+  getInitialAuthStorageMode,
+  hasDesktopUsersFileAccess,
+  isSharedAuthUnavailableError,
+  loadSharedUsers,
+  loginWithSharedAuth,
+  openDesktopUsersFile,
+  type AuthStorageMode,
+} from './auth-client'
 
 type LedModel = {
   name: string
@@ -344,6 +355,14 @@ function saveStoredUsers(users: AppUser[]) {
   window.localStorage.setItem(usersStorageKey, JSON.stringify(users))
 }
 
+function getErrorMessage(error: unknown, fallbackMessage: string) {
+  if (error instanceof Error && error.message) {
+    return error.message
+  }
+
+  return fallbackMessage
+}
+
 function getSelectedWeightedOption<T extends { value: string }>(options: T[], value: string) {
   return options.find((option) => option.value === value) ?? options[0]
 }
@@ -376,6 +395,9 @@ function App() {
   const [loginInput, setLoginInput] = useState('admin')
   const [loginPasswordInput, setLoginPasswordInput] = useState('admin')
   const [loginError, setLoginError] = useState('')
+  const [authStorageMode, setAuthStorageMode] = useState<AuthStorageMode>(() => getInitialAuthStorageMode())
+  const [sessionToken, setSessionToken] = useState<string | null>(null)
+  const [usersFilePath, setUsersFilePath] = useState('')
   const [users, setUsers] = useState<AppUser[]>(() => loadStoredUsers())
   const [activeUser, setActiveUser] = useState<AppUser | null>(null)
   const [activeAdminView, setActiveAdminView] = useState<AdminView>('calculator')
@@ -411,11 +433,15 @@ function App() {
       return
     }
 
+    if (authStorageMode !== 'local') {
+      return
+    }
+
     saveStoredUsers(users)
-  }, [hasCompletedUserMigration, users])
+  }, [authStorageMode, hasCompletedUserMigration, users])
 
   useEffect(() => {
-    if (!activeUser) {
+    if (!activeUser || authStorageMode !== 'local') {
       return
     }
 
@@ -429,7 +455,33 @@ function App() {
     if (refreshedUser !== activeUser) {
       setActiveUser(refreshedUser)
     }
-  }, [activeUser, users])
+  }, [activeUser, authStorageMode, users])
+
+  useEffect(() => {
+    if (activeUser?.role !== 'admin') {
+      return
+    }
+
+    async function refreshManagedUsers() {
+      if (authStorageMode === 'local') {
+        setUsers(loadStoredUsers())
+        setUsersFilePath('')
+        return
+      }
+
+      try {
+        const response = await loadSharedUsers(sessionToken)
+        setUsers(response.users)
+        setUsersFilePath(response.usersFilePath)
+        setAuthStorageMode(response.mode)
+      } catch (error) {
+        setNewUserError(getErrorMessage(error, 'Nepavyko įkelti vartotojų sąrašo.'))
+        setNewUserSuccess('')
+      }
+    }
+
+    void refreshManagedUsers()
+  }, [activeUser, authStorageMode, sessionToken])
 
   useEffect(() => {
     if (activeUser?.role !== 'admin') {
@@ -703,14 +755,32 @@ function App() {
       return
     }
 
-    const matchedUser = users.find((user) => user.username === normalizedUsername)
-
-    if (!matchedUser) {
-      setLoginError('Neteisingas vartotojo vardas arba slaptažodis.')
-      return
-    }
-
     try {
+      try {
+        const sharedAuthResult = await loginWithSharedAuth(normalizedUsername, loginPasswordInput)
+
+        setActiveUser(sharedAuthResult.user)
+        setSessionToken(sharedAuthResult.token)
+        setAuthStorageMode(sharedAuthResult.mode)
+        setUsersFilePath(sharedAuthResult.usersFilePath)
+        setLoginError('')
+        setLoginInput(sharedAuthResult.user.username)
+        setLoginPasswordInput('')
+        return
+      } catch (error) {
+        if (!isSharedAuthUnavailableError(error)) {
+          setLoginError(getErrorMessage(error, 'Nepavyko patikrinti slaptažodžio. Bandykite dar kartą.'))
+          return
+        }
+      }
+
+      const matchedUser = users.find((user) => user.username === normalizedUsername)
+
+      if (!matchedUser) {
+        setLoginError('Neteisingas vartotojo vardas arba slaptažodis.')
+        return
+      }
+
       const isPasswordValid = await verifyPassword(matchedUser, loginPasswordInput)
 
       if (!isPasswordValid) {
@@ -719,6 +789,9 @@ function App() {
       }
 
       setActiveUser(matchedUser)
+      setSessionToken(null)
+      setAuthStorageMode('local')
+      setUsersFilePath('')
       setLoginError('')
       setLoginInput(matchedUser.username)
       setLoginPasswordInput('')
@@ -729,9 +802,25 @@ function App() {
 
   function handleLogout() {
     setActiveUser(null)
+    setSessionToken(null)
+    setAuthStorageMode(getInitialAuthStorageMode())
+    setUsersFilePath('')
+    setUsers(loadStoredUsers())
     setLoginError('')
     setLoginInput('admin')
     setLoginPasswordInput('admin')
+  }
+
+  async function handleOpenUsersFile() {
+    try {
+      const openedPath = await openDesktopUsersFile()
+      setUsersFilePath(openedPath)
+      setNewUserError('')
+      setNewUserSuccess('Vartotojų duomenų bazė atidaryta.')
+    } catch (error) {
+      setNewUserError(getErrorMessage(error, 'Nepavyko atidaryti vartotojų duomenų bazės.'))
+      setNewUserSuccess('')
+    }
   }
 
   async function handleCreateUserSubmit(event: React.FormEvent<HTMLFormElement>) {
@@ -751,13 +840,31 @@ function App() {
       return
     }
 
-    if (users.some((user) => user.username === normalizedUsername)) {
-      setNewUserError('Toks vartotojas jau egzistuoja.')
-      setNewUserSuccess('')
-      return
-    }
-
     try {
+      if (authStorageMode !== 'local') {
+        const response = await createSharedUser(sessionToken, {
+          username: normalizedUsername,
+          password: newPasswordInput,
+          role: newUserRole,
+        })
+
+        setUsers(response.users)
+        setUsersFilePath(response.usersFilePath)
+        setAuthStorageMode(response.mode)
+        setNewUsernameInput('')
+        setNewPasswordInput('')
+        setNewUserRole('user')
+        setNewUserError('')
+        setNewUserSuccess(`Vartotojas „${normalizedUsername}“ sukurtas.`)
+        return
+      }
+
+      if (users.some((user) => user.username === normalizedUsername)) {
+        setNewUserError('Toks vartotojas jau egzistuoja.')
+        setNewUserSuccess('')
+        return
+      }
+
       const createdUser: AppUser = {
         username: normalizedUsername,
         passwordHash: await hashPassword(newPasswordInput),
@@ -777,6 +884,7 @@ function App() {
   }
 
   function handleDeleteUser(username: string) {
+    void (async () => {
     const normalizedUsername = normalizeUsername(username)
     const targetUser = users.find((user) => user.username === normalizedUsername)
 
@@ -800,9 +908,25 @@ function App() {
       return
     }
 
+    if (authStorageMode !== 'local') {
+      try {
+        const response = await deleteSharedUser(sessionToken, normalizedUsername)
+        setUsers(response.users)
+        setUsersFilePath(response.usersFilePath)
+        setAuthStorageMode(response.mode)
+        setNewUserError('')
+        setNewUserSuccess(`Vartotojas „${normalizedUsername}“ ištrintas.`)
+      } catch (error) {
+        setNewUserError(getErrorMessage(error, 'Nepavyko ištrinti vartotojo.'))
+        setNewUserSuccess('')
+      }
+      return
+    }
+
     setUsers((currentUsers) => currentUsers.filter((user) => user.username !== normalizedUsername))
     setNewUserError('')
     setNewUserSuccess(`Vartotojas „${normalizedUsername}“ ištrintas.`)
+    })()
   }
 
   function handleTrussLengthInputChange(value: string) {
@@ -848,11 +972,32 @@ function App() {
 
   const isAdmin = activeUser?.role === 'admin'
   const isUsersPage = isAdmin && activeAdminView === 'users'
+  const usersStorageDescription = authStorageMode === 'server'
+    ? usersFilePath
+      ? `Vartotojai saugomi bendroje serverio SQLite bazėje: ${usersFilePath}`
+      : 'Vartotojai saugomi bendroje serverio SQLite bazėje.'
+    : authStorageMode === 'desktop'
+      ? usersFilePath
+        ? `Vartotojai saugomi programos SQLite bazėje: ${usersFilePath}`
+        : 'Vartotojai saugomi programos SQLite bazėje.'
+      : 'Atsarginis režimas: vartotojai saugomi tik šioje naršyklėje. Kituose kompiuteriuose jų nesimatys, kol nebus naudojamas bendras serverio API.'
   const userManagementSection = isAdmin ? (
     <section className="mx-auto w-full max-w-4xl rounded-[1.8rem] border border-zinc-200 bg-zinc-50 p-5 shadow-sm">
-      <div className="mb-5">
-        <h2 className="text-xl font-semibold text-zinc-900">Vartotojų valdymas</h2>
-        <p className="mt-1 text-sm text-zinc-500">Atskirame puslapyje galite kurti ir šalinti vartotojus, nesimaišant su skaičiuokle.</p>
+      <div className="mb-5 flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+        <div>
+          <h2 className="text-xl font-semibold text-zinc-900">Vartotojų valdymas</h2>
+          <p className="mt-1 text-sm text-zinc-500">Atskirame puslapyje galite kurti ir šalinti vartotojus, nesimaišant su skaičiuokle.</p>
+          <p className="mt-2 text-xs leading-5 text-zinc-500">{usersStorageDescription}</p>
+        </div>
+        {authStorageMode === 'desktop' && hasDesktopUsersFileAccess() ? (
+          <button
+            type="button"
+            className="rounded-2xl border border-zinc-200 bg-white px-4 py-2.5 text-sm font-semibold text-zinc-900 transition hover:bg-zinc-100"
+            onClick={() => void handleOpenUsersFile()}
+          >
+            Atidaryti vartotojų bazę
+          </button>
+        ) : null}
       </div>
 
       <div className="grid gap-5 lg:grid-cols-[0.95fr_1.05fr]">

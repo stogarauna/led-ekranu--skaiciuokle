@@ -20,6 +20,8 @@ current_app_part.txt
 current_app_part_full.txt
 ui_section.txt
 user_view_logic.txt
+data/users.csv
+data/users.db
 
 # Editor directories and files
 .vscode/*

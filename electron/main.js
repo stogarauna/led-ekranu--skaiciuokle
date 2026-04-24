@@ -2,6 +2,16 @@ import { app, BrowserWindow, ipcMain, shell } from 'electron'
 import { copyFile, mkdir, readFile } from 'node:fs/promises'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
+import {
+  hashPassword,
+  isValidRole,
+  loadUsersFromDatabase,
+  minimumPasswordLength,
+  normalizeUsername,
+  openUsersDatabase,
+  saveUsersToDatabase,
+  verifyPassword,
+} from './user-store.js'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 
@@ -40,6 +50,14 @@ function getBundledDataFilePath() {
 
 function getUserDataFilePath() {
   return path.join(app.getPath('userData'), 'data', 'led-models.csv')
+}
+
+function getLegacyUsersCsvPath() {
+  return path.join(app.getPath('userData'), 'data', 'users.csv')
+}
+
+function getUsersDatabasePath() {
+  return path.join(app.getPath('userData'), 'data', 'users.db')
 }
 
 async function ensureDataFile() {
@@ -93,6 +111,14 @@ async function loadLedData() {
   }
 }
 
+function sanitizeUsersForRenderer(users) {
+  return users.map((user) => ({
+    username: user.username,
+    passwordHash: '',
+    role: user.role,
+  }))
+}
+
 function createWindow() {
   const window = new BrowserWindow({
     width: 1360,
@@ -132,6 +158,109 @@ ipcMain.handle('led-data:open-file', async () => {
   }
 
   return dataFilePath
+})
+
+ipcMain.handle('users:list', async () => {
+  const { users, usersFilePath } = await loadUsersFromDatabase(getUsersDatabasePath(), getLegacyUsersCsvPath())
+
+  return {
+    users: sanitizeUsersForRenderer(users),
+    usersFilePath,
+  }
+})
+
+ipcMain.handle('users:login', async (_event, payload) => {
+  const username = normalizeUsername(payload?.username)
+  const password = typeof payload?.password === 'string' ? payload.password : ''
+
+  if (!username || !password) {
+    throw new Error('Įveskite vartotojo vardą ir slaptažodį.')
+  }
+
+  const { users, usersFilePath } = await loadUsersFromDatabase(getUsersDatabasePath(), getLegacyUsersCsvPath())
+  const matchedUser = users.find((user) => user.username === username)
+
+  if (!matchedUser || !verifyPassword(matchedUser, password)) {
+    throw new Error('Neteisingas vartotojo vardas arba slaptažodis.')
+  }
+
+  return {
+    user: {
+      username: matchedUser.username,
+      passwordHash: '',
+      role: matchedUser.role,
+    },
+    usersFilePath,
+  }
+})
+
+ipcMain.handle('users:create', async (_event, payload) => {
+  const username = normalizeUsername(payload?.username)
+  const password = typeof payload?.password === 'string' ? payload.password : ''
+  const role = isValidRole(payload?.role) ? payload.role : 'user'
+
+  if (!username) {
+    throw new Error('Įveskite vartotojo vardą.')
+  }
+
+  if (password.length < minimumPasswordLength) {
+    throw new Error(`Slaptažodis turi būti bent ${minimumPasswordLength} simbolių.`)
+  }
+
+  const { users } = await loadUsersFromDatabase(getUsersDatabasePath(), getLegacyUsersCsvPath())
+
+  if (users.some((user) => user.username === username)) {
+    throw new Error('Toks vartotojas jau egzistuoja.')
+  }
+
+  const result = await saveUsersToDatabase(
+    getUsersDatabasePath(),
+    [...users, { username, passwordHash: hashPassword(password), role }],
+    getLegacyUsersCsvPath(),
+  )
+
+  return {
+    users: sanitizeUsersForRenderer(result.users),
+    usersFilePath: result.usersFilePath,
+  }
+})
+
+ipcMain.handle('users:delete', async (_event, usernameValue) => {
+  const username = normalizeUsername(usernameValue)
+  const { users } = await loadUsersFromDatabase(getUsersDatabasePath(), getLegacyUsersCsvPath())
+  const targetUser = users.find((user) => user.username === username)
+
+  if (!targetUser) {
+    throw new Error('Nepavyko rasti pasirinkto vartotojo.')
+  }
+
+  const adminCount = users.filter((user) => user.role === 'admin').length
+
+  if (targetUser.role === 'admin' && adminCount <= 1) {
+    throw new Error('Turi likti bent vienas administratorius.')
+  }
+
+  const result = await saveUsersToDatabase(
+    getUsersDatabasePath(),
+    users.filter((user) => user.username !== username),
+    getLegacyUsersCsvPath(),
+  )
+
+  return {
+    users: sanitizeUsersForRenderer(result.users),
+    usersFilePath: result.usersFilePath,
+  }
+})
+
+ipcMain.handle('users:open-file', async () => {
+  const { usersFilePath } = await openUsersDatabase(getUsersDatabasePath(), getLegacyUsersCsvPath())
+  const openResult = await shell.openPath(usersFilePath)
+
+  if (openResult) {
+    throw new Error(openResult)
+  }
+
+  return usersFilePath
 })
 
 app.whenReady().then(() => {

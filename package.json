@@ -8,8 +8,10 @@
     "main": "electron/main.js",
     "scripts": {
         "dev": "concurrently -k \"npm:renderer\" \"npm:electron\"",
+        "dev:web": "concurrently -k \"npm:auth-server\" \"npm:renderer\"",
         "renderer": "vite --host 127.0.0.1 --port 5173 --strictPort",
         "electron": "wait-on tcp:5173 && cross-env VITE_DEV_SERVER_URL=http://127.0.0.1:5173 electron .",
+        "auth-server": "node server/auth-server.js",
         "build": "tsc -b && vite build",
         "generate:icons": "node build/generate-icons.cjs",
         "start": "electron .",
