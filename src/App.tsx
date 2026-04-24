@@ -989,6 +989,25 @@ function App() {
     : isCurved
       ? 'bg-zinc-800'
       : 'bg-zinc-800 shadow-[0_16px_40px_rgba(24,24,27,0.16)]'
+  const hasPreviewTruss = isHanging && hasCabinets && selectedTrussOption.value !== 'none' && trussSegmentCount > 0
+  const hasPreviewSteelflex = isHanging && hasCabinets && selectedSteelflexOption.value !== 'none' && steelflexCount > 0
+  const previewRiggingHeightPx = hasCabinets && isHanging ? 112 : 0
+  const previewTrussDisplaySegmentCount = hasPreviewTruss ? Math.round(clamp(trussSegmentCount, 1, 12)) : 0
+  const previewTrussPanelWidthPx = 30
+  const previewTrussSvgWidthPx = Math.max(previewTrussDisplaySegmentCount * previewTrussPanelWidthPx, previewTrussPanelWidthPx)
+  const previewTrussWidthPercent = hasPreviewTruss
+    ? clamp(Math.round((trussLengthM / Math.max(assembledWidthM, 0.5)) * 100), 100, 138)
+    : 100
+  const previewTrussNodeIndexes = Array.from(
+    { length: previewTrussDisplaySegmentCount > 0 ? previewTrussDisplaySegmentCount + 1 : 0 },
+    (_, index) => index,
+  )
+  const previewTrussSegmentIndexes = Array.from({ length: previewTrussDisplaySegmentCount }, (_, index) => index)
+  const previewSteelflexDisplayCount = hasPreviewSteelflex ? Math.round(clamp(steelflexCount, 2, 18)) : 0
+  const previewSteelflexMarkers = Array.from({ length: previewSteelflexDisplayCount }, (_, index) => ({
+    index,
+    xPercent: clamp(((index + 0.5) / Math.max(previewSteelflexDisplayCount, 1)) * 100, 4, 96),
+  }))
 
   const isAdmin = activeUser?.role === 'admin'
   const isUsersPage = isAdmin && activeAdminView === 'users'
@@ -1278,7 +1297,10 @@ function App() {
                       <div className="relative flex min-h-0 w-full flex-1 items-center justify-center self-stretch">
                         <div className="relative" style={previewShapeStyle}>
                           {hasCabinets && isHanging ? (
-                            <div className="pointer-events-none absolute inset-x-0 -top-14 z-10 h-14">
+                            <div
+                              className="pointer-events-none absolute inset-x-0 z-10"
+                              style={{ top: `-${previewRiggingHeightPx}px`, height: `${previewRiggingHeightPx}px` }}
+                            >
                               {pointPreviewMarkers.map((point) => (
                                 <div
                                   key={point.index}
@@ -1291,7 +1313,83 @@ function App() {
                                   <div className="rounded bg-zinc-950/80 px-1 py-0.5 text-[9px] font-medium leading-none text-white ring-1 ring-white/20">
                                     {point.loadKg.toFixed(1)} kg
                                   </div>
-                                  <div className="h-6 w-px bg-zinc-900/65" />
+                                  <div className="h-8 w-px bg-zinc-900/65" />
+                                </div>
+                              ))}
+
+                              {hasPreviewTruss ? (
+                                <div
+                                  className="absolute left-1/2 -translate-x-1/2"
+                                  style={{ top: 54, width: `${previewTrussWidthPercent}%` }}
+                                >
+                                  <svg
+                                    className="h-10 w-full overflow-visible"
+                                    viewBox={`0 0 ${previewTrussSvgWidthPx} 34`}
+                                    preserveAspectRatio="none"
+                                    aria-hidden="true"
+                                  >
+                                    <rect x="0" y="7" width={previewTrussSvgWidthPx} height="4" rx="1.5" fill="#d4d4d8" stroke="#3f3f46" strokeWidth="1" />
+                                    <rect x="0" y="23" width={previewTrussSvgWidthPx} height="4" rx="1.5" fill="#d4d4d8" stroke="#3f3f46" strokeWidth="1" />
+                                    {previewTrussNodeIndexes.map((nodeIndex) => {
+                                      const x = nodeIndex * previewTrussPanelWidthPx
+
+                                      return (
+                                        <line
+                                          key={`truss-node-${nodeIndex}`}
+                                          x1={x}
+                                          y1="9"
+                                          x2={x}
+                                          y2="25"
+                                          stroke="#52525b"
+                                          strokeWidth="1"
+                                        />
+                                      )
+                                    })}
+                                    {previewTrussSegmentIndexes.map((segmentIndex) => {
+                                      const startX = segmentIndex * previewTrussPanelWidthPx
+                                      const endX = (segmentIndex + 1) * previewTrussPanelWidthPx
+
+                                      return (
+                                        <g key={`truss-segment-${segmentIndex}`}>
+                                          <line
+                                            x1={startX}
+                                            y1={segmentIndex % 2 === 0 ? '25' : '9'}
+                                            x2={endX}
+                                            y2={segmentIndex % 2 === 0 ? '9' : '25'}
+                                            stroke="#71717a"
+                                            strokeWidth="1"
+                                          />
+                                          <line
+                                            x1={startX}
+                                            y1={segmentIndex % 2 === 0 ? '9' : '25'}
+                                            x2={endX}
+                                            y2={segmentIndex % 2 === 0 ? '25' : '9'}
+                                            stroke="#a1a1aa"
+                                            strokeOpacity="0.65"
+                                            strokeWidth="0.8"
+                                          />
+                                        </g>
+                                      )
+                                    })}
+                                  </svg>
+                                </div>
+                              ) : (
+                                <div className="absolute inset-x-[6%] top-[72px] h-[2px] rounded-full bg-zinc-500/70" />
+                              )}
+
+                              {previewSteelflexMarkers.map((marker) => (
+                                <div
+                                  key={`steelflex-${marker.index}`}
+                                  className="absolute flex -translate-x-1/2 flex-col items-center"
+                                  style={{
+                                    left: `${marker.xPercent}%`,
+                                    top: hasPreviewTruss ? 82 : 74,
+                                    height: hasPreviewTruss ? 30 : 38,
+                                  }}
+                                >
+                                  <div className="h-2.5 w-2.5 rounded-full border border-zinc-700 bg-zinc-100 shadow-sm" />
+                                  <div className="mt-1 w-px flex-1 bg-zinc-500/80" />
+                                  <div className="h-2 w-2 rounded-full border border-zinc-700 bg-zinc-200/95" />
                                 </div>
                               ))}
                             </div>
