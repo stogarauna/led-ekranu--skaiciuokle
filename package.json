@@ -4,6 +4,9 @@
     "version": "1.0.0",
     "description": "LED ekranu skaiciuokle ir perziuros programa",
     "author": "stoga",
+    "engines": {
+        "node": "22.x"
+    },
     "type": "module",
     "main": "electron/main.js",
     "scripts": {
