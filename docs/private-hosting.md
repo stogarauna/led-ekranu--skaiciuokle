@@ -2,6 +2,29 @@
 
 Šis projektas jau paruoštas veikti privačiame Node hostinge su atskiru autentikacijos serveriu ir SQLite vartotojų baze.
 
+## Render.com
+
+Paprasčiausias variantas dabar yra vienas Render Web Service, kuris aptarnauja ir `dist` frontend, ir `/api` autentikacijos maršrutus iš to paties `node server/auth-server.js` proceso.
+
+- Blueprint failas: `render.yaml`
+- Render servisui reikia persistent disk, nes `users.db` negali būti laikoma laikinoje failų sistemoje
+- Dėl persistent disk Render servisas negalės būti `free` plane ir nebus skalinamas į kelias instancijas
+- Render privalo naudoti `PORT`, o serveris jau pritaikytas automatiškai bindintis prie `0.0.0.0`
+
+### Render diegimo seka
+
+1. Susiekite GitHub repo su Render.
+2. Pasirinkite `Blueprint` arba importuokite repo, kuriame yra `render.yaml`.
+3. Patvirtinkite Web Service sukūrimą.
+4. Patikrinkite, kad Render pridėjo persistent disk į `/opt/render/project/src/data`.
+5. Po deploy atsidarykite `/api/health` ir pagrindinį puslapį.
+
+### Render pastabos
+
+- Jei viską laikote viename Render servise, `VITE_AUTH_API_BASE_URL` nereikia, nes frontend kreipsis į tą patį domeną per `/api`
+- Jei norėsite vėliau skirti frontend ir auth į atskirus servisus, tada `VITE_AUTH_API_BASE_URL` reikės nustatyti į auth serviso adresą
+- `AUTH_TOKEN_SECRET` Render sugeneruos automatiškai per `render.yaml`
+
 ## Rekomenduojama schema
 
 - Frontend: statiniai failai iš `dist/`
@@ -49,6 +72,8 @@ Pastaba: jei serveryje jau turite seną `users.csv`, galite nurodyti `LEGACY_USE
 ## 3. Frontend publikavimas
 
 Paprasčiausias variantas: `dist/` katalogą aptarnauja reverse proxy arba atskiras statinių failų serveris.
+
+Render atveju papildomo reverse proxy nereikia, nes `server/auth-server.js` jau pats aptarnauja ir statinius failus, ir `/api`.
 
 Jei frontend ir API yra tame pačiame domene, `VITE_AUTH_API_BASE_URL` palikite tuščią ir proxinkite `/api` į auth serverį.
 

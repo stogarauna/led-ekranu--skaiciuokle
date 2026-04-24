@@ -1,4 +1,5 @@
 import { createHmac } from 'node:crypto'
+import { readFile } from 'node:fs/promises'
 import http from 'node:http'
 import path from 'node:path'
 import { URL } from 'node:url'
@@ -12,14 +13,26 @@ import {
   verifyPassword,
 } from '../electron/user-store.js'
 
-const resolvedPort = Number.parseInt(process.env.AUTH_SERVER_PORT ?? '3001', 10)
+const resolvedPort = Number.parseInt(process.env.PORT ?? process.env.AUTH_SERVER_PORT ?? '3001', 10)
 const port = Number.isFinite(resolvedPort) ? resolvedPort : 3001
-const host = process.env.AUTH_SERVER_HOST || '127.0.0.1'
+const host = process.env.AUTH_SERVER_HOST || (process.env.RENDER || process.env.PORT ? '0.0.0.0' : '127.0.0.1')
 const usersFilePath = process.env.USERS_DB_PATH || process.env.USERS_FILE_PATH || path.resolve(process.cwd(), 'data', 'users.db')
 const legacyUsersCsvPath = process.env.LEGACY_USERS_CSV_PATH || path.resolve(process.cwd(), 'data', 'users.csv')
 const tokenSecret = process.env.AUTH_TOKEN_SECRET || 'change-me-before-production'
 const corsOrigin = process.env.AUTH_CORS_ORIGIN || '*'
 const sessionLifetimeMs = 12 * 60 * 60 * 1000
+const distDirectoryPath = path.resolve(process.cwd(), 'dist')
+const staticContentTypes = {
+  '.css': 'text/css; charset=utf-8',
+  '.html': 'text/html; charset=utf-8',
+  '.ico': 'image/x-icon',
+  '.js': 'text/javascript; charset=utf-8',
+  '.json': 'application/json; charset=utf-8',
+  '.png': 'image/png',
+  '.svg': 'image/svg+xml',
+  '.txt': 'text/plain; charset=utf-8',
+  '.webp': 'image/webp',
+}
 
 function toClientUser(user) {
   return {
@@ -45,6 +58,58 @@ function sendNoContent(response) {
   setCorsHeaders(response)
   response.writeHead(204)
   response.end()
+}
+
+function sendFile(response, filePath, fileContents, method) {
+  response.writeHead(200, {
+    'Content-Type': staticContentTypes[path.extname(filePath)] || 'application/octet-stream',
+  })
+
+  if (method === 'HEAD') {
+    response.end()
+    return
+  }
+
+  response.end(fileContents)
+}
+
+async function tryServeStaticRequest(requestUrl, response, method) {
+  const isHeadRequest = method === 'HEAD'
+
+  if (method !== 'GET' && !isHeadRequest) {
+    return false
+  }
+
+  const decodedPathname = decodeURIComponent(requestUrl.pathname)
+  const relativePath = decodedPathname === '/'
+    ? 'index.html'
+    : decodedPathname.replace(/^\/+/, '')
+  const candidatePath = path.resolve(distDirectoryPath, relativePath)
+
+  if (!candidatePath.startsWith(distDirectoryPath)) {
+    response.writeHead(403)
+    response.end('Forbidden')
+    return true
+  }
+
+  try {
+    const directFile = await readFile(candidatePath)
+    sendFile(response, candidatePath, directFile, method)
+    return true
+  } catch {
+    if (path.extname(relativePath)) {
+      return false
+    }
+  }
+
+  try {
+    const indexPath = path.join(distDirectoryPath, 'index.html')
+    const indexFile = await readFile(indexPath)
+    sendFile(response, indexPath, indexFile, method)
+    return true
+  } catch {
+    return false
+  }
 }
 
 async function readJsonBody(request) {
@@ -264,6 +329,10 @@ const server = http.createServer(async (request, response) => {
         users: users.map(toClientUser),
         usersFilePath,
       })
+      return
+    }
+
+    if (await tryServeStaticRequest(requestUrl, response, request.method || 'GET')) {
       return
     }
 

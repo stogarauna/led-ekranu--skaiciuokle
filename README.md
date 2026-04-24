@@ -70,9 +70,11 @@ Jei `npm` arba `npx` blokuoja PowerShell vykdymo politika, naudokite `npm.cmd` v
 
 - Dabartinis Vercel statinis diegimas negali būti ilgalaikė bendros vartotojų failų bazės vieta, nes ten failų sistema nėra pastovi tokiam naudojimui
 - Privačiame Node hostinge paleiskite statinį frontend ir atskirai `node server/auth-server.js`
+- Render.com variantui paruoštas vieno serviso blueprint failas `render.yaml`
 - Tikslus paleidimo planas ir Nginx pavyzdys pateikti `docs/private-hosting.md`
 - Svarbūs aplinkos kintamieji:
 	- `AUTH_SERVER_HOST` adresas, prie kurio prisiriša auth serveris, numatytai `127.0.0.1`
+	- `PORT` Render aplinkoje paduodamas automatiškai ir yra naudojamas pirmumo tvarka
 	- `AUTH_SERVER_PORT` serverio portas, numatytai `3001`
 	- `USERS_DB_PATH` tikslus SQLite bazės kelias, jei norite laikyti kitur nei `data/users.db`
 	- `LEGACY_USERS_CSV_PATH` pasirenkamas senos CSV bazės kelias vienkartinei migracijai

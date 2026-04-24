@@ -1,0 +1,25 @@
+services:
+  - type: web
+    name: led-ekranu-skaiciuokle
+    runtime: node
+    plan: starter
+    region: frankfurt
+    buildCommand: npm install && npm run build
+    startCommand: node server/auth-server.js
+    healthCheckPath: /api/health
+    autoDeployTrigger: commit
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: AUTH_SERVER_HOST
+        value: 0.0.0.0
+      - key: USERS_DB_PATH
+        value: /opt/render/project/src/data/users.db
+      - key: LEGACY_USERS_CSV_PATH
+        value: /opt/render/project/src/data/users.csv
+      - key: AUTH_TOKEN_SECRET
+        generateValue: true
+    disk:
+      name: led-data
+      mountPath: /opt/render/project/src/data
+      sizeGB: 5
