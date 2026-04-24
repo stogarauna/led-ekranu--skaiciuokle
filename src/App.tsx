@@ -392,8 +392,8 @@ function App() {
   const [selectedTruss, setSelectedTruss] = useState(trussOptions[0].value)
   const [selectedSteelflex, setSelectedSteelflex] = useState(steelflexOptions[0].value)
   const [isExportingPng, setIsExportingPng] = useState(false)
-  const [loginInput, setLoginInput] = useState('admin')
-  const [loginPasswordInput, setLoginPasswordInput] = useState('admin')
+  const [loginInput, setLoginInput] = useState('')
+  const [loginPasswordInput, setLoginPasswordInput] = useState('')
   const [loginError, setLoginError] = useState('')
   const [authStorageMode, setAuthStorageMode] = useState<AuthStorageMode>(() => getInitialAuthStorageMode())
   const [sessionToken, setSessionToken] = useState<string | null>(null)
@@ -807,8 +807,8 @@ function App() {
     setUsersFilePath('')
     setUsers(loadStoredUsers())
     setLoginError('')
-    setLoginInput('admin')
-    setLoginPasswordInput('admin')
+    setLoginInput('')
+    setLoginPasswordInput('')
   }
 
   async function handleOpenUsersFile() {
@@ -1136,7 +1136,6 @@ function App() {
                   className="w-full rounded-2xl border border-zinc-200 bg-zinc-50 px-4 py-3 text-sm font-medium text-zinc-900 outline-none transition focus:border-zinc-400 focus:bg-white"
                   value={loginInput}
                   onChange={(event) => setLoginInput(event.target.value)}
-                  placeholder="admin"
                 />
               </label>
 
@@ -1148,7 +1147,6 @@ function App() {
                   className="w-full rounded-2xl border border-zinc-200 bg-zinc-50 px-4 py-3 text-sm font-medium text-zinc-900 outline-none transition focus:border-zinc-400 focus:bg-white"
                   value={loginPasswordInput}
                   onChange={(event) => setLoginPasswordInput(event.target.value)}
-                  placeholder="admin"
                 />
               </label>
 
