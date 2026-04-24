@@ -82,8 +82,10 @@ Jei frontend ir API yra skirtinguose domenuose:
 - frontend `.env.production.local`:
 
 ```env
-VITE_AUTH_API_BASE_URL=https://auth.your-domain.example/api
+VITE_AUTH_API_BASE_URL=https://auth.your-domain.example
 ```
+
+Jei netyčia nurodysite adresą su `/api` gale, klientas dabar tai toleruos, bet rekomenduojama naudoti tik serviso šaknį.
 
 - auth serverio `AUTH_CORS_ORIGIN` turi rodyti į frontend domeną, pvz. `https://app.your-domain.example`
 

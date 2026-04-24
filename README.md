@@ -80,4 +80,4 @@ Jei `npm` arba `npx` blokuoja PowerShell vykdymo politika, naudokite `npm.cmd` v
 	- `LEGACY_USERS_CSV_PATH` pasirenkamas senos CSV bazės kelias vienkartinei migracijai
 	- `AUTH_TOKEN_SECRET` privalomai pakeiskite produkcijoje, kad admin sesijos būtų saugios
 	- `AUTH_CORS_ORIGIN` jei frontend ir API veiks per skirtingus domenus
-	- `VITE_AUTH_API_BASE_URL` jei frontend turi kreiptis į atskirą API adresą
+	- `VITE_AUTH_API_BASE_URL` jei frontend turi kreiptis į atskirą API adresą; nurodykite serviso šaknį be `/api`

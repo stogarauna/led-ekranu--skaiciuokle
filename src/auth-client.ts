@@ -24,6 +24,18 @@ type AppError = Error & {
 const sharedAuthUnavailableCode = 'SHARED_AUTH_UNAVAILABLE'
 const configuredAuthApiBaseUrl = (import.meta.env.VITE_AUTH_API_BASE_URL ?? '').trim().replace(/\/$/, '')
 
+function normalizeConfiguredApiBaseUrl(pathname: string) {
+  if (!configuredAuthApiBaseUrl) {
+    return ''
+  }
+
+  if (configuredAuthApiBaseUrl.endsWith('/api') && pathname.startsWith('/api')) {
+    return configuredAuthApiBaseUrl.slice(0, -4)
+  }
+
+  return configuredAuthApiBaseUrl
+}
+
 function createUnavailableError() {
   const error = new Error('Bendras vartotojų serveris nepasiekiamas.') as AppError
   error.code = sharedAuthUnavailableCode
@@ -43,7 +55,7 @@ function shouldAttemptServerAuth() {
 }
 
 function buildApiUrl(pathname: string) {
-  return configuredAuthApiBaseUrl ? `${configuredAuthApiBaseUrl}${pathname}` : pathname
+  return configuredAuthApiBaseUrl ? `${normalizeConfiguredApiBaseUrl(pathname)}${pathname}` : pathname
 }
 
 function buildAuthHeaders(token?: string | null) {
