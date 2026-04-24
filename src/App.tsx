@@ -373,8 +373,8 @@ function App() {
   const [selectedTruss, setSelectedTruss] = useState(trussOptions[0].value)
   const [selectedSteelflex, setSelectedSteelflex] = useState(steelflexOptions[0].value)
   const [isExportingPng, setIsExportingPng] = useState(false)
-  const [loginInput, setLoginInput] = useState('')
-  const [loginPasswordInput, setLoginPasswordInput] = useState('')
+  const [loginInput, setLoginInput] = useState('admin')
+  const [loginPasswordInput, setLoginPasswordInput] = useState('admin')
   const [loginError, setLoginError] = useState('')
   const [users, setUsers] = useState<AppUser[]>(() => loadStoredUsers())
   const [activeUser, setActiveUser] = useState<AppUser | null>(null)
@@ -730,8 +730,8 @@ function App() {
   function handleLogout() {
     setActiveUser(null)
     setLoginError('')
-    setLoginInput('')
-    setLoginPasswordInput('')
+    setLoginInput('admin')
+    setLoginPasswordInput('admin')
   }
 
   async function handleCreateUserSubmit(event: React.FormEvent<HTMLFormElement>) {
@@ -1216,13 +1216,18 @@ function App() {
                                 <div className="text-xs text-zinc-500">Gylis</div>
                                 <div className="mt-1 font-semibold">{formatValue(selectedModel?.depthM ?? '-', 'm')}</div>
                               </div>
-                              <div className="rounded-2xl border border-zinc-200 bg-white p-3 shadow-sm">
+                              <div className="rounded-2xl border border-zinc-300 bg-zinc-100 p-3 shadow-sm">
                                 <div className="text-xs text-zinc-500">Bendra galia</div>
-                                <div className="mt-1 font-semibold">{(totalPowerW / 1000).toFixed(2)} kW</div>
+                                <div className="mt-1 text-base font-semibold">{(totalPowerW / 1000).toFixed(2)} kW</div>
                               </div>
-                              <div className="rounded-2xl border border-zinc-200 bg-white p-3 shadow-sm">
+                              <div className="rounded-2xl border border-zinc-300 bg-zinc-100 p-3 shadow-sm">
                                 <div className="text-xs text-zinc-500">Ekrano svoris</div>
-                                <div className="mt-1 font-semibold">{totalWeightKg.toFixed(1)} kg</div>
+                                <div className="mt-1 text-base font-semibold">{totalWeightKg.toFixed(1)} kg</div>
+                                {isHanging ? (
+                                  <div className="mt-1 text-[11px] leading-4 text-zinc-500">
+                                    Svorių pasiskirstymas, kai keltuvai išdėstyti vienodu atstumu per visą ekraną.
+                                  </div>
+                                ) : null}
                               </div>
                               {isHanging ? (
                                 <div className="rounded-2xl border border-zinc-200 bg-white p-3 shadow-sm">
@@ -1267,6 +1272,9 @@ function App() {
                                 <div className="rounded-2xl border border-zinc-200 bg-white p-3 shadow-sm">
                                   <div className="text-xs text-zinc-500">Kabinam bendrą svorį</div>
                                   <div className="mt-1 font-semibold">{totalSupportedWeightKg.toFixed(1)} kg</div>
+                                  <div className="mt-1 text-[11px] leading-4 text-zinc-500">
+                                    Svorių pasiskirstymas, kai keltuvai išdėstyti vienodu atstumu per visą ekraną.
+                                  </div>
                                 </div>
                               ) : null}
                               {isHanging ? (
@@ -1308,11 +1316,16 @@ function App() {
                               <div className="text-xs text-zinc-500">Dydis</div>
                               <div className="mt-1 font-semibold">{formatMeters(assembledWidthM)} × {formatMeters(assembledHeightM)}</div>
                             </div>
-                            <div className="rounded-2xl border border-zinc-200 bg-white p-3 shadow-sm">
+                            <div className="rounded-2xl border border-zinc-300 bg-zinc-100 p-3 shadow-sm">
                               <div className="text-xs text-zinc-500">Svoris</div>
                               <div className="mt-1 font-semibold">{(isHanging ? totalSupportedWeightKg : totalWeightKg).toFixed(1)} kg</div>
+                              {isHanging ? (
+                                <div className="mt-1 text-[11px] leading-4 text-zinc-500">
+                                  Svorių pasiskirstymas, kai keltuvai išdėstyti vienodu atstumu per visą ekraną.
+                                </div>
+                              ) : null}
                             </div>
-                            <div className="rounded-2xl border border-zinc-200 bg-white p-3 shadow-sm">
+                            <div className="rounded-2xl border border-zinc-300 bg-zinc-100 p-3 shadow-sm">
                               <div className="text-xs text-zinc-500">Galia</div>
                               <div className="mt-1 font-semibold">{(totalPowerW / 1000).toFixed(2)} kW</div>
                             </div>
@@ -1343,8 +1356,8 @@ function App() {
             </div>
           </div>
 
-          <div className="min-h-0 overflow-y-auto bg-white p-5 lg:p-6">
-            <div className="flex h-full flex-col gap-5 pr-1">
+          <div className="min-h-0 overflow-y-auto bg-white p-4 lg:p-5">
+            <div className="flex h-full flex-col gap-4 pr-1">
               <div>
                 <h2 className="text-lg font-semibold">{isAdmin ? 'Nustatymai' : 'Vartotojo langas'}</h2>
                 <p className="text-sm text-zinc-500">
@@ -1353,7 +1366,7 @@ function App() {
               </div>
 
               {isAdmin ? (
-                <section className="rounded-[1.8rem] border border-zinc-200 bg-zinc-50 p-4 shadow-sm">
+                <section className="rounded-[1.6rem] border border-zinc-200 bg-zinc-50 p-3 shadow-sm">
                   <div className="flex items-center justify-between gap-3">
                     <h3 className="text-sm font-semibold uppercase tracking-[0.18em] text-zinc-500">Duomenų bazė</h3>
                     <button
@@ -1369,11 +1382,11 @@ function App() {
                     </button>
                   </div>
                   <div className={`${isDataSectionCollapsed ? 'mt-0 hidden' : 'mt-3 space-y-3'}`}>
-                    <div className="rounded-2xl border border-zinc-200 bg-white px-4 py-3 text-sm text-zinc-600 shadow-sm">
+                    <div className="rounded-2xl border border-zinc-200 bg-white px-3 py-2.5 text-sm text-zinc-600 shadow-sm">
                       <div className="text-xs uppercase tracking-[0.18em] text-zinc-400">Statusas</div>
                       <div className="mt-1 font-medium text-zinc-800">{statusMessage}</div>
                     </div>
-                    <div className="rounded-2xl border border-zinc-200 bg-white px-4 py-3 text-sm text-zinc-600 shadow-sm">
+                    <div className="rounded-2xl border border-zinc-200 bg-white px-3 py-2.5 text-sm text-zinc-600 shadow-sm">
                       <div className="text-xs uppercase tracking-[0.18em] text-zinc-400">CSV failas</div>
                       <div className="mt-1 break-all text-xs leading-5">{dataFilePath || 'Kelias bus parodytas po įkėlimo'}</div>
                     </div>
@@ -1385,7 +1398,7 @@ function App() {
                     <div className="grid grid-cols-1 gap-3">
                       <button
                         type="button"
-                        className="rounded-2xl border border-zinc-200 px-4 py-3 text-sm font-semibold transition hover:bg-zinc-100"
+                        className="rounded-2xl border border-zinc-200 px-4 py-2.5 text-sm font-semibold transition hover:bg-zinc-100"
                         onClick={() => void refreshLedData()}
                       >
                         Atnaujinti
@@ -1395,11 +1408,11 @@ function App() {
                 </section>
               ) : null}
 
-              <section className="rounded-[1.8rem] border border-zinc-200 bg-zinc-50 p-4 shadow-sm">
+              <section className="rounded-[1.6rem] border border-zinc-200 bg-zinc-50 p-3 shadow-sm">
                 <h3 className="mb-3 text-sm font-semibold uppercase tracking-[0.18em] text-zinc-500">Pasirinkimas</h3>
                 <div className="relative">
                   <select
-                    className="w-full appearance-none rounded-2xl border border-zinc-200 bg-white px-4 py-3 pr-11 text-sm shadow-sm outline-none transition focus:border-zinc-400"
+                    className="w-full appearance-none rounded-2xl border border-zinc-200 bg-white px-4 py-2.5 pr-11 text-sm shadow-sm outline-none transition focus:border-zinc-400"
                     value={selectedModel?.name ?? ''}
                     onChange={(event) => setSelectedModelName(event.target.value)}
                     disabled={isLoading || models.length === 0}
@@ -1414,64 +1427,22 @@ function App() {
                 </div>
               </section>
 
-              <section className="rounded-[1.8rem] border border-zinc-200 bg-zinc-50 p-4 shadow-sm">
-                <h3 className="mb-3 text-sm font-semibold uppercase tracking-[0.18em] text-zinc-500">Vieno modulio parametrai</h3>
-                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                  <div className="rounded-2xl border border-zinc-200 bg-white px-4 py-3 shadow-sm">
-                    <div className="text-xs uppercase tracking-[0.16em] text-zinc-400">Lankstumas</div>
-                    <div className="mt-2 text-sm font-semibold text-zinc-800">{canBend ? 'Gali lenktis' : 'Nesilenkia'}</div>
-                  </div>
-                  <div className="rounded-2xl border border-zinc-200 bg-white px-4 py-3 shadow-sm">
-                    <div className="text-xs uppercase tracking-[0.16em] text-zinc-400">Lenkimo kampai</div>
-                    <div className="mt-2 text-sm font-semibold text-zinc-800">{bendRangeLabel}</div>
-                  </div>
-                  <div className="rounded-2xl border border-zinc-200 bg-white px-4 py-3 shadow-sm">
-                    <div className="text-xs uppercase tracking-[0.16em] text-zinc-400">Rėmo aukštis</div>
-                    <div className="mt-2 text-sm font-semibold text-zinc-800">{frameHeightRangeLabel}</div>
-                  </div>
-                  <div className="rounded-2xl border border-zinc-200 bg-white px-4 py-3 shadow-sm">
-                    <div className="text-xs uppercase tracking-[0.16em] text-zinc-400">Gylis</div>
-                    <div className="mt-2 text-sm font-semibold text-zinc-800">{formatModuleDimension(selectedModel?.depthM ?? '-')}</div>
-                  </div>
-                  {parameterCards.map((card) => (
-                    <div key={card.key} className="rounded-2xl border border-zinc-200 bg-white px-4 py-3 shadow-sm">
-                      <div className="text-xs uppercase tracking-[0.16em] text-zinc-400">{card.label}</div>
-                      <div className="mt-2 text-sm font-semibold text-zinc-800">
-                        {formatModuleParameterValue(card.key, selectedModel?.[card.key] ?? '-', card.unit)}
-                      </div>
-                    </div>
-                  ))}
-                  {isAdmin
-                    ? parameterRows.map((item) => (
-                      <div key={item.key} className="rounded-2xl border border-zinc-200 bg-white px-4 py-3 shadow-sm">
-                        <div className="text-xs uppercase tracking-[0.16em] text-zinc-400">{item.label}</div>
-                        <div className="mt-2 text-sm font-semibold text-zinc-800">
-                          {item.unit === 'm'
-                            ? formatModuleDimension(selectedModel?.[item.key] ?? '-')
-                            : formatValue(selectedModel?.[item.key] ?? '-', item.unit)}
-                        </div>
-                      </div>
-                    ))
-                    : null}
-                </div>
-              </section>
-
-              <section className="rounded-[1.8rem] border border-zinc-200 bg-zinc-50 p-4 shadow-sm">
+              <section className="rounded-[1.6rem] border border-zinc-200 bg-zinc-50 p-3 shadow-sm">
                 <h3 className="mb-3 text-sm font-semibold uppercase tracking-[0.18em] text-zinc-500">Skaičiavimas</h3>
                 <div className="space-y-3">
-                  <div className="rounded-2xl border border-zinc-200 bg-white p-3 shadow-sm">
+                  <div className="rounded-2xl border border-zinc-200 bg-white p-2.5 shadow-sm">
                     <div className="mb-2 text-xs uppercase tracking-[0.16em] text-zinc-400">Montavimo būdas</div>
                     <div className="grid grid-cols-2 gap-2">
                       <button
                         type="button"
-                        className={`rounded-xl px-4 py-3 text-sm font-semibold transition ${mountingMode === 'statom' ? 'bg-zinc-900 text-white' : 'border border-zinc-200 bg-white text-zinc-800 hover:bg-zinc-50'}`}
+                        className={`rounded-xl px-4 py-2.5 text-sm font-semibold transition ${mountingMode === 'statom' ? 'bg-zinc-900 text-white' : 'border border-zinc-200 bg-white text-zinc-800 hover:bg-zinc-50'}`}
                         onClick={() => setMountingMode('statom')}
                       >
                         Statom
                       </button>
                       <button
                         type="button"
-                        className={`rounded-xl px-4 py-3 text-sm font-semibold transition ${mountingMode === 'kabinam' ? 'bg-zinc-900 text-white' : 'border border-zinc-200 bg-white text-zinc-800 hover:bg-zinc-50'}`}
+                        className={`rounded-xl px-4 py-2.5 text-sm font-semibold transition ${mountingMode === 'kabinam' ? 'bg-zinc-900 text-white' : 'border border-zinc-200 bg-white text-zinc-800 hover:bg-zinc-50'}`}
                         onClick={() => setMountingMode('kabinam')}
                       >
                         Kabinam
@@ -1480,12 +1451,12 @@ function App() {
                   </div>
 
                   <div className="grid grid-cols-1 gap-3">
-                    <div className="rounded-2xl border border-zinc-200 bg-white p-3 shadow-sm">
+                    <div className="rounded-2xl border border-zinc-200 bg-white p-2.5 shadow-sm">
                       <div className="mb-2 text-xs uppercase tracking-[0.16em] text-zinc-400">Norimas plotis</div>
                       <div className="flex items-center gap-2">
                         <button
                           type="button"
-                          className="shrink-0 rounded-xl border border-zinc-200 px-3 py-2 text-sm font-semibold transition hover:bg-zinc-50"
+                          className="shrink-0 rounded-xl border border-zinc-200 px-3 py-1.5 text-sm font-semibold transition hover:bg-zinc-50"
                           onClick={() => adjustInputValue('width', -1)}
                         >
                           −
@@ -1494,13 +1465,13 @@ function App() {
                           type="number"
                           min="0"
                           step="1"
-                          className="min-w-0 flex-1 rounded-xl border border-zinc-200 px-3 py-2 text-sm font-medium outline-none focus:border-zinc-400"
+                          className="min-w-0 flex-1 rounded-xl border border-zinc-200 px-3 py-1.5 text-sm font-medium outline-none focus:border-zinc-400"
                           value={screenWidthInput}
                           onChange={(event) => setScreenWidthInput(event.target.value)}
                         />
                         <button
                           type="button"
-                          className="shrink-0 rounded-xl border border-zinc-200 px-3 py-2 text-sm font-semibold transition hover:bg-zinc-50"
+                          className="shrink-0 rounded-xl border border-zinc-200 px-3 py-1.5 text-sm font-semibold transition hover:bg-zinc-50"
                           onClick={() => adjustInputValue('width', 1)}
                         >
                           +
@@ -1510,12 +1481,12 @@ function App() {
                       <div className="mt-1 text-[11px] text-zinc-400">1 modulis = {formatMeters(modelWidthM)}</div>
                     </div>
 
-                    <div className="rounded-2xl border border-zinc-200 bg-white p-3 shadow-sm">
+                    <div className="rounded-2xl border border-zinc-200 bg-white p-2.5 shadow-sm">
                       <div className="mb-2 text-xs uppercase tracking-[0.16em] text-zinc-400">Norimas aukštis</div>
                       <div className="flex items-center gap-2">
                         <button
                           type="button"
-                          className="shrink-0 rounded-xl border border-zinc-200 px-3 py-2 text-sm font-semibold transition hover:bg-zinc-50"
+                          className="shrink-0 rounded-xl border border-zinc-200 px-3 py-1.5 text-sm font-semibold transition hover:bg-zinc-50"
                           onClick={() => adjustInputValue('height', -1)}
                         >
                           −
@@ -1524,13 +1495,13 @@ function App() {
                           type="number"
                           min="0"
                           step="1"
-                          className="min-w-0 flex-1 rounded-xl border border-zinc-200 px-3 py-2 text-sm font-medium outline-none focus:border-zinc-400"
+                          className="min-w-0 flex-1 rounded-xl border border-zinc-200 px-3 py-1.5 text-sm font-medium outline-none focus:border-zinc-400"
                           value={screenHeightInput}
                           onChange={(event) => setScreenHeightInput(event.target.value)}
                         />
                         <button
                           type="button"
-                          className="shrink-0 rounded-xl border border-zinc-200 px-3 py-2 text-sm font-semibold transition hover:bg-zinc-50"
+                          className="shrink-0 rounded-xl border border-zinc-200 px-3 py-1.5 text-sm font-semibold transition hover:bg-zinc-50"
                           onClick={() => adjustInputValue('height', 1)}
                         >
                           +
@@ -1663,6 +1634,48 @@ function App() {
                     ) : null}
                   </div>
 
+                </div>
+              </section>
+
+              <section className="rounded-[1.6rem] border border-zinc-200 bg-zinc-50 p-3 shadow-sm">
+                <h3 className="mb-3 text-sm font-semibold uppercase tracking-[0.18em] text-zinc-500">Vieno modulio parametrai</h3>
+                <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2">
+                  <div className="rounded-2xl border border-zinc-200 bg-white px-3 py-2.5 shadow-sm">
+                    <div className="text-xs uppercase tracking-[0.16em] text-zinc-400">Lankstumas</div>
+                    <div className="mt-1.5 text-sm font-semibold text-zinc-800">{canBend ? 'Gali lenktis' : 'Nesilenkia'}</div>
+                  </div>
+                  <div className="rounded-2xl border border-zinc-200 bg-white px-3 py-2.5 shadow-sm">
+                    <div className="text-xs uppercase tracking-[0.16em] text-zinc-400">Lenkimo kampai</div>
+                    <div className="mt-1.5 text-sm font-semibold text-zinc-800">{bendRangeLabel}</div>
+                  </div>
+                  <div className="rounded-2xl border border-zinc-200 bg-white px-3 py-2.5 shadow-sm">
+                    <div className="text-xs uppercase tracking-[0.16em] text-zinc-400">Rėmo aukštis</div>
+                    <div className="mt-1.5 text-sm font-semibold text-zinc-800">{frameHeightRangeLabel}</div>
+                  </div>
+                  <div className="rounded-2xl border border-zinc-200 bg-white px-3 py-2.5 shadow-sm">
+                    <div className="text-xs uppercase tracking-[0.16em] text-zinc-400">Gylis</div>
+                    <div className="mt-1.5 text-sm font-semibold text-zinc-800">{formatModuleDimension(selectedModel?.depthM ?? '-')}</div>
+                  </div>
+                  {parameterCards.map((card) => (
+                    <div key={card.key} className="rounded-2xl border border-zinc-200 bg-white px-3 py-2.5 shadow-sm">
+                      <div className="text-xs uppercase tracking-[0.16em] text-zinc-400">{card.label}</div>
+                      <div className="mt-1.5 text-sm font-semibold text-zinc-800">
+                        {formatModuleParameterValue(card.key, selectedModel?.[card.key] ?? '-', card.unit)}
+                      </div>
+                    </div>
+                  ))}
+                  {isAdmin
+                    ? parameterRows.map((item) => (
+                      <div key={item.key} className="rounded-2xl border border-zinc-200 bg-white px-3 py-2.5 shadow-sm">
+                        <div className="text-xs uppercase tracking-[0.16em] text-zinc-400">{item.label}</div>
+                        <div className="mt-1.5 text-sm font-semibold text-zinc-800">
+                          {item.unit === 'm'
+                            ? formatModuleDimension(selectedModel?.[item.key] ?? '-')
+                            : formatValue(selectedModel?.[item.key] ?? '-', item.unit)}
+                        </div>
+                      </div>
+                    ))
+                    : null}
                 </div>
               </section>
 
