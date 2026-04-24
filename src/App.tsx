@@ -363,6 +363,11 @@ function getErrorMessage(error: unknown, fallbackMessage: string) {
   return fallbackMessage
 }
 
+function readSubmittedField(formData: FormData, fieldName: string) {
+  const value = formData.get(fieldName)
+  return typeof value === 'string' ? value : ''
+}
+
 function getSelectedWeightedOption<T extends { value: string }>(options: T[], value: string) {
   return options.find((option) => option.value === value) ?? options[0]
 }
@@ -748,16 +753,22 @@ function App() {
   async function handleLoginSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault()
 
-    const normalizedUsername = normalizeUsername(loginInput)
+    const formData = new FormData(event.currentTarget)
+    const submittedUsername = readSubmittedField(formData, 'username')
+    const submittedPassword = readSubmittedField(formData, 'password')
+    const normalizedUsername = normalizeUsername(submittedUsername)
 
-    if (!normalizedUsername || !loginPasswordInput) {
+    setLoginInput(submittedUsername)
+    setLoginPasswordInput(submittedPassword)
+
+    if (!normalizedUsername || !submittedPassword) {
       setLoginError('Įveskite vartotojo vardą ir slaptažodį.')
       return
     }
 
     try {
       try {
-        const sharedAuthResult = await loginWithSharedAuth(normalizedUsername, loginPasswordInput)
+        const sharedAuthResult = await loginWithSharedAuth(normalizedUsername, submittedPassword)
 
         setActiveUser(sharedAuthResult.user)
         setSessionToken(sharedAuthResult.token)
@@ -781,7 +792,7 @@ function App() {
         return
       }
 
-      const isPasswordValid = await verifyPassword(matchedUser, loginPasswordInput)
+      const isPasswordValid = await verifyPassword(matchedUser, submittedPassword)
 
       if (!isPasswordValid) {
         setLoginError('Neteisingas vartotojo vardas arba slaptažodis.')
@@ -826,7 +837,16 @@ function App() {
   async function handleCreateUserSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault()
 
-    const normalizedUsername = normalizeUsername(newUsernameInput)
+    const formData = new FormData(event.currentTarget)
+    const submittedUsername = readSubmittedField(formData, 'new-username')
+    const submittedPassword = readSubmittedField(formData, 'new-password')
+    const submittedRole = readSubmittedField(formData, 'new-role')
+    const normalizedUsername = normalizeUsername(submittedUsername)
+    const normalizedRole = isValidRole(submittedRole) ? submittedRole : newUserRole
+
+    setNewUsernameInput(submittedUsername)
+    setNewPasswordInput(submittedPassword)
+    setNewUserRole(normalizedRole)
 
     if (!normalizedUsername) {
       setNewUserError('Įveskite vartotojo vardą.')
@@ -834,7 +854,7 @@ function App() {
       return
     }
 
-    if (newPasswordInput.length < minimumPasswordLength) {
+    if (submittedPassword.length < minimumPasswordLength) {
       setNewUserError(`Slaptažodis turi būti bent ${minimumPasswordLength} simbolių.`)
       setNewUserSuccess('')
       return
@@ -844,8 +864,8 @@ function App() {
       if (authStorageMode !== 'local') {
         const response = await createSharedUser(sessionToken, {
           username: normalizedUsername,
-          password: newPasswordInput,
-          role: newUserRole,
+          password: submittedPassword,
+          role: normalizedRole,
         })
 
         setUsers(response.users)
@@ -867,8 +887,8 @@ function App() {
 
       const createdUser: AppUser = {
         username: normalizedUsername,
-        passwordHash: await hashPassword(newPasswordInput),
-        role: newUserRole,
+        passwordHash: await hashPassword(submittedPassword),
+        role: normalizedRole,
       }
 
       setUsers((currentUsers) => [...currentUsers, createdUser])
@@ -1007,7 +1027,9 @@ function App() {
             <label className="block">
               <span className="mb-2 block text-xs uppercase tracking-[0.16em] text-zinc-400">Vartotojo vardas</span>
               <input
+                name="new-username"
                 type="text"
+                autoComplete="off"
                 className="w-full rounded-2xl border border-zinc-200 bg-white px-4 py-3 text-sm font-medium text-zinc-900 outline-none transition focus:border-zinc-400"
                 value={newUsernameInput}
                 onChange={(event) => setNewUsernameInput(event.target.value)}
@@ -1017,7 +1039,9 @@ function App() {
             <label className="block">
               <span className="mb-2 block text-xs uppercase tracking-[0.16em] text-zinc-400">Slaptažodis</span>
               <input
+                name="new-password"
                 type="password"
+                autoComplete="new-password"
                 className="w-full rounded-2xl border border-zinc-200 bg-white px-4 py-3 text-sm font-medium text-zinc-900 outline-none transition focus:border-zinc-400"
                 value={newPasswordInput}
                 onChange={(event) => setNewPasswordInput(event.target.value)}
@@ -1027,6 +1051,7 @@ function App() {
             <label className="block">
               <span className="mb-2 block text-xs uppercase tracking-[0.16em] text-zinc-400">Rolė</span>
               <select
+                name="new-role"
                 className="w-full rounded-2xl border border-zinc-200 bg-white px-4 py-3 text-sm font-medium text-zinc-900 outline-none transition focus:border-zinc-400"
                 value={newUserRole}
                 onChange={(event) => setNewUserRole(event.target.value as UserRole)}
@@ -1131,6 +1156,7 @@ function App() {
               <label className="block">
                 <span className="mb-2 block text-xs uppercase tracking-[0.16em] text-zinc-400">Prisijungimo vardas</span>
                 <input
+                  name="username"
                   type="text"
                   autoComplete="username"
                   className="w-full rounded-2xl border border-zinc-200 bg-zinc-50 px-4 py-3 text-sm font-medium text-zinc-900 outline-none transition focus:border-zinc-400 focus:bg-white"
@@ -1142,6 +1168,7 @@ function App() {
               <label className="block">
                 <span className="mb-2 block text-xs uppercase tracking-[0.16em] text-zinc-400">Slaptažodis</span>
                 <input
+                  name="password"
                   type="password"
                   autoComplete="current-password"
                   className="w-full rounded-2xl border border-zinc-200 bg-zinc-50 px-4 py-3 text-sm font-medium text-zinc-900 outline-none transition focus:border-zinc-400 focus:bg-white"
