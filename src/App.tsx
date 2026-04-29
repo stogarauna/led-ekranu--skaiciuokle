@@ -778,8 +778,10 @@ function App() {
 
   useLayoutEffect(() => {
     const previewViewport = previewViewportRef.current
+    const shouldSkipPreviewMeasurement = !activeUser || (activeUser.role === 'admin' && activeAdminView === 'users')
 
-    if (!previewViewport) {
+    if (shouldSkipPreviewMeasurement || !previewViewport) {
+      setPreviewViewportSize({ width: 0, height: 0 })
       return
     }
 
@@ -817,7 +819,7 @@ function App() {
       window.cancelAnimationFrame(animationFrameId)
       resizeObserver.disconnect()
     }
-  }, [])
+  }, [activeAdminView, activeUser])
 
   function adjustInputValue(field: 'width' | 'height' | 'trussLength', delta: number) {
     const currentValue = field === 'width'
