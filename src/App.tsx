@@ -1,5 +1,5 @@
 import type { CSSProperties } from 'react'
-import { useEffect, useLayoutEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import bundledCsvText from '../data/led-models.csv?raw'
 import {
   createSharedUser,
@@ -270,9 +270,48 @@ function parseBundledCsv(text: string): LedModel[] {
 
   return lines.slice(1).map((line) => {
     const values = line.split(',').map((value) => value.trim())
-    return Object.fromEntries(csvFieldMap.map(([_, key], index) => [key, values[index] ?? ''])) as LedModel
+    return Object.fromEntries(csvFieldMap.map(([, key], index) => [key, values[index] ?? ''])) as LedModel
   })
 }
+
+function getInitialLedDataState() {
+  try {
+    const models = parseBundledCsv(bundledCsvText)
+
+    return {
+      models,
+      selectedModelName: models[0]?.name ?? '',
+      dataFilePath: 'Naudojamas projekte esantis CSV šablonas',
+      statusMessage: `Įkelta modelių: ${models.length} (projekto šablonas)`,
+      errorMessage: '',
+      isLoading: false,
+    }
+  } catch (error) {
+    try {
+      const fallbackModels = parseBundledCsv(bundledCsvText)
+
+      return {
+        models: fallbackModels,
+        selectedModelName: fallbackModels[0]?.name ?? '',
+        dataFilePath: 'Naudojamas projekte esantis CSV šablonas',
+        statusMessage: `Įkelta modelių: ${fallbackModels.length} (projekto šablonas)`,
+        errorMessage: error instanceof Error ? `${error.message} Rodomas atsarginis CSV variantas.` : 'Rodomas atsarginis CSV variantas.',
+        isLoading: false,
+      }
+    } catch (fallbackError) {
+      return {
+        models: [] as LedModel[],
+        selectedModelName: '',
+        dataFilePath: '',
+        statusMessage: 'Duomenų įkelti nepavyko',
+        errorMessage: fallbackError instanceof Error ? fallbackError.message : 'Nepavyko įkelti LED modelių.',
+        isLoading: false,
+      }
+    }
+  }
+}
+
+const initialLedDataState = getInitialLedDataState()
 
 function normalizeUsername(value: string) {
   return value.trim().toLowerCase()
@@ -422,12 +461,12 @@ function getRiggingWeight(model: LedModel | undefined, weightKey?: keyof LedMode
 
 function App() {
   const previewViewportRef = useRef<HTMLDivElement | null>(null)
-  const [models, setModels] = useState<LedModel[]>([])
-  const [selectedModelName, setSelectedModelName] = useState('')
-  const [dataFilePath, setDataFilePath] = useState('')
-  const [statusMessage, setStatusMessage] = useState('Kraunami LED modeliai...')
-  const [errorMessage, setErrorMessage] = useState('')
-  const [isLoading, setIsLoading] = useState(true)
+  const [models, setModels] = useState<LedModel[]>(initialLedDataState.models)
+  const [selectedModelName, setSelectedModelName] = useState(initialLedDataState.selectedModelName)
+  const [dataFilePath, setDataFilePath] = useState(initialLedDataState.dataFilePath)
+  const [statusMessage, setStatusMessage] = useState(initialLedDataState.statusMessage)
+  const [errorMessage, setErrorMessage] = useState(initialLedDataState.errorMessage)
+  const [isLoading, setIsLoading] = useState(initialLedDataState.isLoading)
   const [isDataSectionCollapsed, setIsDataSectionCollapsed] = useState(true)
   const [mountingMode, setMountingMode] = useState<'statom' | 'kabinam'>('statom')
   const [screenWidthInput, setScreenWidthInput] = useState('0')
@@ -454,15 +493,51 @@ function App() {
   const [newUserError, setNewUserError] = useState('')
   const [newUserSuccess, setNewUserSuccess] = useState('')
   const [previewViewportSize, setPreviewViewportSize] = useState({ width: 0, height: 0 })
+  const initialUsersRef = useRef<AppUser[] | null>(null)
 
-  useEffect(() => {
-    void refreshLedData()
+  if (initialUsersRef.current === null) {
+    initialUsersRef.current = users
+  }
+
+  const resolvedActiveUser = authStorageMode === 'local' && activeUser
+    ? users.find((user) => user.username === activeUser.username) ?? null
+    : activeUser
+  const resolvedActiveUserRole = resolvedActiveUser?.role ?? null
+  const resolvedActiveUsername = resolvedActiveUser?.username ?? null
+  const resolvedActiveAdminView: AdminView = resolvedActiveUser?.role === 'admin' ? activeAdminView : 'calculator'
+
+  const applyModels = useCallback((nextModels: LedModel[], sourceLabel: string, sourcePath: string) => {
+    setModels(nextModels)
+    setDataFilePath(sourcePath)
+    setSelectedModelName((current) => current || nextModels[0]?.name || '')
+    setStatusMessage(`Įkelta modelių: ${nextModels.length} (${sourceLabel})`)
   }, [])
+
+  const refreshLedData = useCallback(async () => {
+    try {
+      setIsLoading(true)
+      setErrorMessage('')
+
+      applyModels(parseBundledCsv(bundledCsvText), 'projekto šablonas', 'Naudojamas projekte esantis CSV šablonas')
+    } catch (error) {
+      try {
+        const fallbackModels = parseBundledCsv(bundledCsvText)
+        applyModels(fallbackModels, 'projekto šablonas', 'Naudojamas projekte esantis CSV šablonas')
+        setErrorMessage(error instanceof Error ? `${error.message} Rodomas atsarginis CSV variantas.` : 'Rodomas atsarginis CSV variantas.')
+      } catch (fallbackError) {
+        setErrorMessage(fallbackError instanceof Error ? fallbackError.message : 'Nepavyko įkelti LED modelių.')
+        setStatusMessage('Duomenų įkelti nepavyko')
+      }
+    } finally {
+      setIsLoading(false)
+    }
+  }, [applyModels])
 
   useEffect(() => {
     async function ensureHashedUsers() {
       try {
-        const { migratedUsers, didMigrate } = await migrateUsersToHashed(users)
+        const seedUsers = initialUsersRef.current ?? []
+        const { migratedUsers, didMigrate } = await migrateUsersToHashed(seedUsers)
 
         if (didMigrate) {
           setUsers(migratedUsers)
@@ -488,24 +563,7 @@ function App() {
   }, [authStorageMode, hasCompletedUserMigration, users])
 
   useEffect(() => {
-    if (!activeUser || authStorageMode !== 'local') {
-      return
-    }
-
-    const refreshedUser = users.find((user) => user.username === activeUser.username)
-
-    if (!refreshedUser) {
-      setActiveUser(null)
-      return
-    }
-
-    if (refreshedUser !== activeUser) {
-      setActiveUser(refreshedUser)
-    }
-  }, [activeUser, authStorageMode, users])
-
-  useEffect(() => {
-    if (activeUser?.role !== 'admin') {
+    if (resolvedActiveUserRole !== 'admin') {
       return
     }
 
@@ -528,40 +586,7 @@ function App() {
     }
 
     void refreshManagedUsers()
-  }, [activeUser, authStorageMode, sessionToken])
-
-  useEffect(() => {
-    if (activeUser?.role !== 'admin') {
-      setActiveAdminView('calculator')
-    }
-  }, [activeUser])
-
-  function applyModels(nextModels: LedModel[], sourceLabel: string, sourcePath: string) {
-    setModels(nextModels)
-    setDataFilePath(sourcePath)
-    setSelectedModelName((current) => current || nextModels[0]?.name || '')
-    setStatusMessage(`Įkelta modelių: ${nextModels.length} (${sourceLabel})`)
-  }
-
-  async function refreshLedData() {
-    try {
-      setIsLoading(true)
-      setErrorMessage('')
-
-      applyModels(parseBundledCsv(bundledCsvText), 'projekto šablonas', 'Naudojamas projekte esantis CSV šablonas')
-    } catch (error) {
-      try {
-        const fallbackModels = parseBundledCsv(bundledCsvText)
-        applyModels(fallbackModels, 'projekto šablonas', 'Naudojamas projekte esantis CSV šablonas')
-        setErrorMessage(error instanceof Error ? `${error.message} Rodomas atsarginis CSV variantas.` : 'Rodomas atsarginis CSV variantas.')
-      } catch (fallbackError) {
-        setErrorMessage(fallbackError instanceof Error ? fallbackError.message : 'Nepavyko įkelti LED modelių.')
-        setStatusMessage('Duomenų įkelti nepavyko')
-      }
-    } finally {
-      setIsLoading(false)
-    }
-  }
+  }, [authStorageMode, resolvedActiveUserRole, resolvedActiveUsername, sessionToken])
 
   async function exportPreviewAsPng() {
     if (!hasCabinets) {
@@ -690,7 +715,11 @@ function App() {
   const totalResX = cabinetsWide * readNumber(selectedModel?.resX ?? '0', 0)
   const totalResY = cabinetsHigh * readNumber(selectedModel?.resY ?? '0', 0)
   const suspensionPointCount = Math.max(2, readCount(pointCountInput) || 2)
-  const trussLengthM = readCount(trussLengthInput)
+  const hasCabinets = totalCabinets > 0
+  const isHanging = mountingMode === 'kabinam'
+  const autoTrussLengthInput = String(Math.ceil(assembledWidthM))
+  const resolvedTrussLengthInput = isHanging && isTrussLengthAuto ? autoTrussLengthInput : trussLengthInput
+  const trussLengthM = readCount(resolvedTrussLengthInput)
   const distribution = getLoadDistributionFactors(suspensionPointCount)
   const selectedTrussOption = getSelectedWeightedOption(trussOptions, selectedTruss)
   const selectedSteelflexOption = getSelectedWeightedOption(steelflexOptions, selectedSteelflex)
@@ -700,8 +729,6 @@ function App() {
   const parsedDepth = readNumber(selectedModel?.depthM ?? '0.1', 0.1)
   const pixelPitchX = readNumber(selectedModel?.resX ?? '128', 128)
   const pixelPitchY = readNumber(selectedModel?.resY ?? '128', 128)
-  const hasCabinets = totalCabinets > 0
-  const isHanging = mountingMode === 'kabinam'
   const hasFrame05m = hasNumericValue(selectedModel?.frameWeightKg05m)
   const hasFrame1m = hasNumericValue(selectedModel?.frameWeightKg1m)
   const frameSpanM = hasFrame05m ? 0.5 : hasFrame1m ? 1 : 0
@@ -784,17 +811,9 @@ function App() {
     ? clamp(1 - (suspensionPointCount - 5) * 0.025, 0.8, 0.92)
     : 1
 
-  useEffect(() => {
-    if (!isHanging || !isTrussLengthAuto) {
-      return
-    }
-
-    setTrussLengthInput(String(Math.ceil(assembledWidthM)))
-  }, [assembledWidthM, isHanging, isTrussLengthAuto])
-
   useLayoutEffect(() => {
     const previewViewport = previewViewportRef.current
-    const shouldSkipPreviewMeasurement = !activeUser || (activeUser.role === 'admin' && activeAdminView === 'users')
+    const shouldSkipPreviewMeasurement = !resolvedActiveUsername || (resolvedActiveUserRole === 'admin' && resolvedActiveAdminView === 'users')
 
     if (shouldSkipPreviewMeasurement || !previewViewport) {
       setPreviewViewportSize({ width: 0, height: 0 })
@@ -835,14 +854,14 @@ function App() {
       window.cancelAnimationFrame(animationFrameId)
       resizeObserver.disconnect()
     }
-  }, [activeAdminView, activeUser])
+  }, [resolvedActiveAdminView, resolvedActiveUserRole, resolvedActiveUsername])
 
   function adjustInputValue(field: 'width' | 'height' | 'trussLength', delta: number) {
     const currentValue = field === 'width'
       ? screenWidthInput
       : field === 'height'
         ? screenHeightInput
-        : trussLengthInput
+        : resolvedTrussLengthInput
     const nextValue = Math.max(0, readCount(currentValue) + delta)
     const formattedValue = String(nextValue)
 
@@ -1066,7 +1085,7 @@ function App() {
 
   function resetTrussLengthToScreenWidth() {
     setIsTrussLengthAuto(true)
-    setTrussLengthInput(String(Math.ceil(assembledWidthM)))
+    setTrussLengthInput(autoTrussLengthInput)
   }
 
   const previewShapeStyle: CSSProperties = {
@@ -1134,8 +1153,8 @@ function App() {
     xPercent: clamp(((index + 0.5) / Math.max(previewSteelflexDisplayCount, 1)) * 100, 4, 96),
   }))
 
-  const isAdmin = activeUser?.role === 'admin'
-  const isUsersPage = isAdmin && activeAdminView === 'users'
+  const isAdmin = resolvedActiveUser?.role === 'admin'
+  const isUsersPage = isAdmin && resolvedActiveAdminView === 'users'
   const usersStorageDescription = authStorageMode === 'server'
     ? usersFilePath
       ? `Vartotojai saugomi bendroje serverio SQLite bazėje: ${usersFilePath}`
@@ -1243,14 +1262,14 @@ function App() {
                   <div>
                     <div className="text-sm font-semibold text-zinc-900">{user.username}</div>
                     <div className="mt-1 text-xs uppercase tracking-[0.16em] text-zinc-400">
-                      {user.role}{activeUser?.username === user.username ? ' • aktyvus' : ''}
+                      {user.role}{resolvedActiveUser?.username === user.username ? ' • aktyvus' : ''}
                     </div>
                   </div>
                   <button
                     type="button"
                     className="rounded-xl border border-red-200 px-3 py-2 text-xs font-semibold text-red-700 transition hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-50"
                     onClick={() => handleDeleteUser(user.username)}
-                    disabled={activeUser?.username === user.username}
+                    disabled={resolvedActiveUser?.username === user.username}
                   >
                     Ištrinti
                   </button>
@@ -1262,7 +1281,7 @@ function App() {
     </section>
   ) : null
 
-  if (!activeUser) {
+  if (!resolvedActiveUser) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-[radial-gradient(circle_at_top,_rgba(244,244,245,0.95),_rgba(228,228,231,0.85)_40%,_rgba(212,212,216,0.8))] px-4 py-10 text-zinc-900">
         <div className="grid w-full max-w-5xl overflow-hidden rounded-[2rem] border border-zinc-200 bg-white shadow-[0_30px_90px_rgba(24,24,27,0.12)] lg:grid-cols-[1.2fr_0.9fr]">
@@ -1356,14 +1375,14 @@ function App() {
                 <div className="flex items-center gap-2 rounded-2xl border border-zinc-200 bg-white p-1 shadow-sm">
                   <button
                     type="button"
-                    className={`rounded-xl px-3 py-2 text-sm font-medium transition ${activeAdminView === 'calculator' ? 'bg-zinc-950 text-white' : 'text-zinc-600 hover:bg-zinc-100'}`}
+                    className={`rounded-xl px-3 py-2 text-sm font-medium transition ${resolvedActiveAdminView === 'calculator' ? 'bg-zinc-950 text-white' : 'text-zinc-600 hover:bg-zinc-100'}`}
                     onClick={() => setActiveAdminView('calculator')}
                   >
                     Skaičiuoklė
                   </button>
                   <button
                     type="button"
-                    className={`rounded-xl px-3 py-2 text-sm font-medium transition ${activeAdminView === 'users' ? 'bg-zinc-950 text-white' : 'text-zinc-600 hover:bg-zinc-100'}`}
+                    className={`rounded-xl px-3 py-2 text-sm font-medium transition ${resolvedActiveAdminView === 'users' ? 'bg-zinc-950 text-white' : 'text-zinc-600 hover:bg-zinc-100'}`}
                     onClick={() => setActiveAdminView('users')}
                   >
                     Vartotojai
@@ -1371,7 +1390,7 @@ function App() {
                 </div>
               ) : null}
             </div>
-            <div className="text-sm text-zinc-500">Prisijungta: <span className="font-semibold text-zinc-800">{activeUser.username}</span></div>
+            <div className="text-sm text-zinc-500">Prisijungta: <span className="font-semibold text-zinc-800">{resolvedActiveUser.username}</span></div>
             <button
               type="button"
               className="rounded-xl border border-zinc-200 bg-white px-4 py-2 text-sm font-medium text-zinc-700 transition hover:bg-zinc-100"
@@ -1577,7 +1596,7 @@ function App() {
                 ) : null}
               </div>
 
-              <div className="min-h-0 flex-1 overflow-hidden rounded-[2rem] border border-zinc-200 bg-white p-4 shadow-sm">
+              <div className="mt-3 min-h-0 flex-1 overflow-hidden rounded-[2rem] border border-zinc-200 bg-white p-4 shadow-sm">
                 <div className="flex h-full flex-col gap-4 overflow-y-auto pr-1">
                   <div className="border-b border-zinc-200 pb-4">
                     <h3 className="text-2xl font-semibold tracking-tight">{selectedModel?.name ?? 'LED ekranas'}</h3>
