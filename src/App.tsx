@@ -1,5 +1,5 @@
 import type { CSSProperties } from 'react'
-import { useEffect, useState } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import bundledCsvText from '../data/led-models.csv?raw'
 import {
   createSharedUser,
@@ -114,6 +114,46 @@ const defaultUsers: AppUser[] = [
 
 function clamp(value: number, min: number, max: number) {
   return Math.min(max, Math.max(min, value))
+}
+
+function getContainedPreviewSize(
+  availableWidth: number,
+  availableHeight: number,
+  aspectRatio: number,
+  minWidth: number,
+  minHeight: number,
+) {
+  if (!Number.isFinite(availableWidth) || !Number.isFinite(availableHeight) || !Number.isFinite(aspectRatio)) {
+    return { width: 0, height: 0 }
+  }
+
+  if (availableWidth <= 0 || availableHeight <= 0 || aspectRatio <= 0) {
+    return { width: 0, height: 0 }
+  }
+
+  let width = Math.min(availableWidth, availableHeight * aspectRatio)
+  let height = width / aspectRatio
+
+  const upscaleFactor = Math.max(
+    minWidth > 0 ? minWidth / Math.max(width, 1) : 1,
+    minHeight > 0 ? minHeight / Math.max(height, 1) : 1,
+    1,
+  )
+
+  if (upscaleFactor > 1) {
+    const upscaledWidth = width * upscaleFactor
+    const upscaledHeight = height * upscaleFactor
+
+    if (upscaledWidth <= availableWidth && upscaledHeight <= availableHeight) {
+      width = upscaledWidth
+      height = upscaledHeight
+    }
+  }
+
+  return {
+    width: Math.round(width),
+    height: Math.round(height),
+  }
 }
 
 function getPreviewModuleColor(isWarmPalette: boolean, row: number, column: number) {
@@ -381,6 +421,7 @@ function getRiggingWeight(model: LedModel | undefined, weightKey?: keyof LedMode
 }
 
 function App() {
+  const previewViewportRef = useRef<HTMLDivElement | null>(null)
   const [models, setModels] = useState<LedModel[]>([])
   const [selectedModelName, setSelectedModelName] = useState('')
   const [dataFilePath, setDataFilePath] = useState('')
@@ -412,6 +453,7 @@ function App() {
   const [newUserRole, setNewUserRole] = useState<UserRole>('user')
   const [newUserError, setNewUserError] = useState('')
   const [newUserSuccess, setNewUserSuccess] = useState('')
+  const [previewViewportSize, setPreviewViewportSize] = useState({ width: 0, height: 0 })
 
   useEffect(() => {
     void refreshLedData()
@@ -704,9 +746,6 @@ function App() {
     labelPercent: clamp((pointAnchorSeams[index] / Math.max(cabinetsWide, 1)) * 100, 6, 94),
   }))
   const previewAspectRatio = hasCabinets ? assembledWidthMm / Math.max(assembledHeightMm, 1) : 1
-  const previewUsesWidthFit = previewAspectRatio >= 1.35
-  const previewWidthPercent = clamp(Math.round(68 + previewAspectRatio * 10), 72, 92)
-  const previewHeightPercent = clamp(Math.round(60 + (1 / Math.max(previewAspectRatio, 0.45)) * 10), 64, 84)
   const isCurved = (selectedModel?.bendAngleMinDeg ?? '').includes('-') || (selectedModel?.bendAngleMaxDeg ?? '').includes('+')
   const isTransparent = (selectedModel?.name ?? '').toLowerCase().includes('transparent')
   const bendAngleMinLabel = selectedModel?.bendAngleMinDeg ?? '-'
@@ -718,6 +757,12 @@ function App() {
   const frameHeightRangeLabel = hasNumericValue(frameHeightMinLabel) && hasNumericValue(frameHeightMaxLabel)
     ? `${formatCentimeters(readNumber(frameHeightMinLabel, 0))} iki ${formatCentimeters(readNumber(frameHeightMaxLabel, 0))}`
     : 'Rėmo aukštis nenurodytas'
+  const previewRiggingHeightPx = hasCabinets && isHanging ? 112 : 0
+  const previewAvailableWidthPx = Math.max(previewViewportSize.width - 24, 0) * 0.92
+  const previewAvailableHeightPx = Math.max(previewViewportSize.height - previewRiggingHeightPx - 28, 0) * 0.84
+  const previewFrameSize = hasCabinets
+    ? getContainedPreviewSize(previewAvailableWidthPx, previewAvailableHeightPx, previewAspectRatio, 280, 200)
+    : { width: 0, height: 0 }
 
   useEffect(() => {
     if (!isHanging || !isTrussLengthAuto) {
@@ -726,6 +771,46 @@ function App() {
 
     setTrussLengthInput(String(Math.ceil(assembledWidthM)))
   }, [assembledWidthM, isHanging, isTrussLengthAuto])
+
+  useLayoutEffect(() => {
+    const previewViewport = previewViewportRef.current
+
+    if (!previewViewport) {
+      return
+    }
+
+    const updatePreviewViewportSize = () => {
+      const { width, height } = previewViewport.getBoundingClientRect()
+
+      setPreviewViewportSize((current) => {
+        if (Math.abs(current.width - width) < 0.5 && Math.abs(current.height - height) < 0.5) {
+          return current
+        }
+
+        return { width, height }
+      })
+    }
+
+    updatePreviewViewportSize()
+
+    if (typeof ResizeObserver !== 'function') {
+      window.addEventListener('resize', updatePreviewViewportSize)
+
+      return () => {
+        window.removeEventListener('resize', updatePreviewViewportSize)
+      }
+    }
+
+    const resizeObserver = new ResizeObserver(() => {
+      updatePreviewViewportSize()
+    })
+
+    resizeObserver.observe(previewViewport)
+
+    return () => {
+      resizeObserver.disconnect()
+    }
+  }, [])
 
   function adjustInputValue(field: 'width' | 'height' | 'trussLength', delta: number) {
     const currentValue = field === 'width'
@@ -960,13 +1045,8 @@ function App() {
   }
 
   const previewShapeStyle: CSSProperties = {
-    width: hasCabinets ? (previewUsesWidthFit ? `${previewWidthPercent}%` : 'auto') : 0,
-    height: hasCabinets ? (previewUsesWidthFit ? 'auto' : `${previewHeightPercent}%`) : 0,
-    maxWidth: hasCabinets ? '92%' : 0,
-    maxHeight: hasCabinets ? '84%' : 0,
-    minWidth: hasCabinets ? '280px' : 0,
-    minHeight: hasCabinets ? '200px' : 0,
-    aspectRatio: hasCabinets ? `${assembledWidthMm} / ${Math.max(assembledHeightMm, 1)}` : undefined,
+    width: hasCabinets ? `${previewFrameSize.width}px` : 0,
+    height: hasCabinets ? `${previewFrameSize.height}px` : 0,
     transform: 'none',
     opacity: hasCabinets ? (isTransparent ? 0.55 : 1) : 0,
     borderWidth: isTransparent ? 2 : 0,
@@ -991,7 +1071,6 @@ function App() {
       : 'bg-zinc-800 shadow-[0_16px_40px_rgba(24,24,27,0.16)]'
   const hasPreviewTruss = isHanging && hasCabinets && selectedTrussOption.value !== 'none' && trussSegmentCount > 0
   const hasPreviewSteelflex = isHanging && hasCabinets && selectedSteelflexOption.value !== 'none' && steelflexCount > 0
-  const previewRiggingHeightPx = hasCabinets && isHanging ? 112 : 0
   const previewTrussDisplaySegmentCount = hasPreviewTruss ? Math.round(clamp(trussSegmentCount, 1, 12)) : 0
   const previewTrussPanelWidthPx = 30
   const previewTrussSvgWidthPx = Math.max(previewTrussDisplaySegmentCount * previewTrussPanelWidthPx, previewTrussPanelWidthPx)
@@ -1294,7 +1373,7 @@ function App() {
                   >
 
                     <div className="flex h-full w-full flex-col items-center gap-5 px-2 text-center sm:px-4">
-                      <div className="relative flex min-h-0 w-full flex-1 items-center justify-center self-stretch">
+                      <div ref={previewViewportRef} className="relative flex min-h-0 w-full flex-1 items-center justify-center self-stretch">
                         <div className="relative" style={previewShapeStyle}>
                           {hasCabinets && isHanging ? (
                             <div
