@@ -1566,14 +1566,15 @@ function App() {
                         </div>
                       </div>
 
-                        {selectedModel ? (
-                          <div className="absolute -bottom-4 right-0 border border-zinc-300 bg-white px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.16em] text-zinc-600">
-                            {selectedModel.depthM} m
-                          </div>
-                        ) : null}
                     </div>
                   </div>
                 </div>
+
+                {selectedModel ? (
+                  <div className="pointer-events-none absolute bottom-3 right-3 border border-zinc-300 bg-white px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.16em] text-zinc-600 shadow-sm">
+                    {selectedModel.depthM} m
+                  </div>
+                ) : null}
               </div>
 
               <div className="min-h-0 flex-1 overflow-hidden rounded-[2rem] border border-zinc-200 bg-white p-4 shadow-sm">
