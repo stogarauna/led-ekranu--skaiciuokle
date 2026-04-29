@@ -1129,6 +1129,7 @@ function App() {
   const previewOverlayLabelClassName = isTransparent
     ? 'border border-zinc-400/60 bg-white/80 text-zinc-700'
     : 'border border-white/20 bg-zinc-950/70 text-white'
+  const riggingDistributionNote = 'Svorių pasiskirstymas, kai keltuvai išdėstyti vienodu atstumu per visą ekraną.'
 
   const previewShapeClassName = isTransparent
     ? 'border-zinc-500 bg-zinc-200/40'
@@ -1423,6 +1424,12 @@ function App() {
               </div>
 
               <div className="relative h-[320px] shrink-0 overflow-hidden border border-zinc-300 bg-white sm:h-[360px] xl:h-[400px]">
+                {hasCabinets && isHanging ? (
+                  <div className="pointer-events-none absolute inset-x-6 top-3 z-20 text-center text-[11px] leading-4 text-zinc-500 sm:inset-x-16">
+                    {riggingDistributionNote}
+                  </div>
+                ) : null}
+
                 <div
                   className="absolute inset-0 opacity-60"
                   style={{
@@ -1643,11 +1650,6 @@ function App() {
                               <div className="rounded-2xl border border-zinc-300 bg-zinc-100 p-3 shadow-sm">
                                 <div className="text-xs text-zinc-500">Ekrano svoris</div>
                                 <div className="mt-1 text-base font-semibold">{totalWeightKg.toFixed(1)} kg</div>
-                                {isHanging ? (
-                                  <div className="mt-1 text-[11px] leading-4 text-zinc-500">
-                                    Svorių pasiskirstymas, kai keltuvai išdėstyti vienodu atstumu per visą ekraną.
-                                  </div>
-                                ) : null}
                               </div>
                               {isHanging ? (
                                 <div className="rounded-2xl border border-zinc-200 bg-white p-3 shadow-sm">
@@ -1690,11 +1692,8 @@ function App() {
                               ) : null}
                               {isHanging ? (
                                 <div className="rounded-2xl border border-zinc-200 bg-white p-3 shadow-sm">
-                                  <div className="text-xs text-zinc-500">Kabinam bendrą svorį</div>
+                                  <div className="text-xs text-zinc-500">Visas svoris be keltuvų</div>
                                   <div className="mt-1 font-semibold">{totalSupportedWeightKg.toFixed(1)} kg</div>
-                                  <div className="mt-1 text-[11px] leading-4 text-zinc-500">
-                                    Svorių pasiskirstymas, kai keltuvai išdėstyti vienodu atstumu per visą ekraną.
-                                  </div>
                                 </div>
                               ) : null}
                               {isHanging ? (
@@ -1718,6 +1717,9 @@ function App() {
                                   </div>
                                   <div className="text-xs text-zinc-500">Bendras svoris: {totalSupportedWeightKg.toFixed(1)} kg</div>
                                 </div>
+                                <div className="mt-2 text-center text-[11px] leading-4 text-zinc-500">
+                                  {riggingDistributionNote}
+                                </div>
                                 <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
                                   {pointLoadsKg.map((point) => (
                                     <div key={point.index} className="rounded-2xl border border-zinc-200 bg-zinc-50 px-4 py-3">
@@ -1739,11 +1741,6 @@ function App() {
                             <div className="rounded-2xl border border-zinc-300 bg-zinc-100 p-3 shadow-sm">
                               <div className="text-xs text-zinc-500">Svoris</div>
                               <div className="mt-1 font-semibold">{(isHanging ? totalSupportedWeightKg : totalWeightKg).toFixed(1)} kg</div>
-                              {isHanging ? (
-                                <div className="mt-1 text-[11px] leading-4 text-zinc-500">
-                                  Svorių pasiskirstymas, kai keltuvai išdėstyti vienodu atstumu per visą ekraną.
-                                </div>
-                              ) : null}
                             </div>
                             <div className="rounded-2xl border border-zinc-300 bg-zinc-100 p-3 shadow-sm">
                               <div className="text-xs text-zinc-500">Galia</div>
