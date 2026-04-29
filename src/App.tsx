@@ -746,6 +746,9 @@ function App() {
     labelPercent: clamp((pointAnchorSeams[index] / Math.max(cabinetsWide, 1)) * 100, 6, 94),
   }))
   const previewAspectRatio = hasCabinets ? assembledWidthMm / Math.max(assembledHeightMm, 1) : 1
+  const previewUsesWidthFit = previewAspectRatio >= 1.35
+  const previewWidthPercent = clamp(Math.round(68 + previewAspectRatio * 10), 72, 92)
+  const previewHeightPercent = clamp(Math.round(60 + (1 / Math.max(previewAspectRatio, 0.45)) * 10), 64, 84)
   const isCurved = (selectedModel?.bendAngleMinDeg ?? '').includes('-') || (selectedModel?.bendAngleMaxDeg ?? '').includes('+')
   const isTransparent = (selectedModel?.name ?? '').toLowerCase().includes('transparent')
   const bendAngleMinLabel = selectedModel?.bendAngleMinDeg ?? '-'
@@ -763,6 +766,7 @@ function App() {
   const previewFrameSize = hasCabinets
     ? getContainedPreviewSize(previewAvailableWidthPx, previewAvailableHeightPx, previewAspectRatio, 280, 200)
     : { width: 0, height: 0 }
+  const hasMeasuredPreviewFrameSize = previewFrameSize.width >= 24 && previewFrameSize.height >= 24
 
   useEffect(() => {
     if (!isHanging || !isTrussLengthAuto) {
@@ -792,11 +796,13 @@ function App() {
     }
 
     updatePreviewViewportSize()
+    const animationFrameId = window.requestAnimationFrame(updatePreviewViewportSize)
 
     if (typeof ResizeObserver !== 'function') {
       window.addEventListener('resize', updatePreviewViewportSize)
 
       return () => {
+        window.cancelAnimationFrame(animationFrameId)
         window.removeEventListener('resize', updatePreviewViewportSize)
       }
     }
@@ -808,6 +814,7 @@ function App() {
     resizeObserver.observe(previewViewport)
 
     return () => {
+      window.cancelAnimationFrame(animationFrameId)
       resizeObserver.disconnect()
     }
   }, [])
@@ -1045,8 +1052,25 @@ function App() {
   }
 
   const previewShapeStyle: CSSProperties = {
-    width: hasCabinets ? `${previewFrameSize.width}px` : 0,
-    height: hasCabinets ? `${previewFrameSize.height}px` : 0,
+    width: hasCabinets
+      ? hasMeasuredPreviewFrameSize
+        ? `${previewFrameSize.width}px`
+        : previewUsesWidthFit
+          ? `${previewWidthPercent}%`
+          : 'auto'
+      : 0,
+    height: hasCabinets
+      ? hasMeasuredPreviewFrameSize
+        ? `${previewFrameSize.height}px`
+        : previewUsesWidthFit
+          ? 'auto'
+          : `${previewHeightPercent}%`
+      : 0,
+    maxWidth: hasCabinets && !hasMeasuredPreviewFrameSize ? '92%' : undefined,
+    maxHeight: hasCabinets && !hasMeasuredPreviewFrameSize ? '84%' : undefined,
+    minWidth: hasCabinets && !hasMeasuredPreviewFrameSize ? '280px' : undefined,
+    minHeight: hasCabinets && !hasMeasuredPreviewFrameSize ? '200px' : undefined,
+    aspectRatio: hasCabinets && !hasMeasuredPreviewFrameSize ? `${assembledWidthMm} / ${Math.max(assembledHeightMm, 1)}` : undefined,
     transform: 'none',
     opacity: hasCabinets ? (isTransparent ? 0.55 : 1) : 0,
     borderWidth: isTransparent ? 2 : 0,
