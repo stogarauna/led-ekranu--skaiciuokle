@@ -761,12 +761,28 @@ function App() {
     ? `${formatCentimeters(readNumber(frameHeightMinLabel, 0))} iki ${formatCentimeters(readNumber(frameHeightMaxLabel, 0))}`
     : 'Rėmo aukštis nenurodytas'
   const previewRiggingHeightPx = hasCabinets && isHanging ? 112 : 0
-  const previewAvailableWidthPx = Math.max(previewViewportSize.width - 24, 0) * 0.92
-  const previewAvailableHeightPx = Math.max(previewViewportSize.height - previewRiggingHeightPx - 28, 0) * 0.84
+  const hasPreviewTruss = isHanging && hasCabinets && selectedTrussOption.value !== 'none' && trussSegmentCount > 0
+  const previewContentWidthFactor = hasPreviewTruss
+    ? clamp(trussLengthM / Math.max(assembledWidthM, 0.5), 1, 1.38)
+    : 1
+  const previewHorizontalInsetPx = 24
+  const previewVerticalInsetPx = 24
+  const previewAvailableWidthPx = Math.max(previewViewportSize.width - previewHorizontalInsetPx * 2, 0)
+  const previewAvailableHeightPx = Math.max(previewViewportSize.height - previewRiggingHeightPx - previewVerticalInsetPx * 2, 0)
   const previewFrameSize = hasCabinets
-    ? getContainedPreviewSize(previewAvailableWidthPx, previewAvailableHeightPx, previewAspectRatio, 280, 200)
+    ? getContainedPreviewSize(
+        previewAvailableWidthPx / previewContentWidthFactor,
+        previewAvailableHeightPx,
+        previewAspectRatio,
+        280,
+        200,
+      )
     : { width: 0, height: 0 }
   const hasMeasuredPreviewFrameSize = previewFrameSize.width >= 24 && previewFrameSize.height >= 24
+  const usesDenseRiggingPreview = isHanging && suspensionPointCount >= 5
+  const densePreviewScale = usesDenseRiggingPreview
+    ? clamp(1 - (suspensionPointCount - 5) * 0.025, 0.8, 0.92)
+    : 1
 
   useEffect(() => {
     if (!isHanging || !isTrussLengthAuto) {
@@ -1073,7 +1089,12 @@ function App() {
     minWidth: hasCabinets && !hasMeasuredPreviewFrameSize ? '280px' : undefined,
     minHeight: hasCabinets && !hasMeasuredPreviewFrameSize ? '200px' : undefined,
     aspectRatio: hasCabinets && !hasMeasuredPreviewFrameSize ? `${assembledWidthMm} / ${Math.max(assembledHeightMm, 1)}` : undefined,
-    transform: 'none',
+    transform: hasCabinets && isHanging
+      ? usesDenseRiggingPreview
+        ? `scale(${densePreviewScale})`
+        : `translateY(${Math.round(previewRiggingHeightPx / 2)}px)`
+      : 'none',
+    transformOrigin: hasCabinets && isHanging && usesDenseRiggingPreview ? 'top center' : undefined,
     opacity: hasCabinets ? (isTransparent ? 0.55 : 1) : 0,
     borderWidth: isTransparent ? 2 : 0,
   }
@@ -1095,13 +1116,12 @@ function App() {
     : isCurved
       ? 'bg-zinc-800'
       : 'bg-zinc-800 shadow-[0_16px_40px_rgba(24,24,27,0.16)]'
-  const hasPreviewTruss = isHanging && hasCabinets && selectedTrussOption.value !== 'none' && trussSegmentCount > 0
   const hasPreviewSteelflex = isHanging && hasCabinets && selectedSteelflexOption.value !== 'none' && steelflexCount > 0
   const previewTrussDisplaySegmentCount = hasPreviewTruss ? Math.round(clamp(trussSegmentCount, 1, 12)) : 0
   const previewTrussPanelWidthPx = 30
   const previewTrussSvgWidthPx = Math.max(previewTrussDisplaySegmentCount * previewTrussPanelWidthPx, previewTrussPanelWidthPx)
   const previewTrussWidthPercent = hasPreviewTruss
-    ? clamp(Math.round((trussLengthM / Math.max(assembledWidthM, 0.5)) * 100), 100, 138)
+    ? Math.round(previewContentWidthFactor * 100)
     : 100
   const previewTrussNodeIndexes = Array.from(
     { length: previewTrussDisplaySegmentCount > 0 ? previewTrussDisplaySegmentCount + 1 : 0 },
@@ -1367,9 +1387,9 @@ function App() {
             {userManagementSection}
           </div>
         ) : (
-        <div className="grid min-h-0 flex-1 grid-cols-1 lg:grid-cols-[1.8fr_0.9fr]">
-          <div className="min-h-0 border-b border-zinc-200 bg-zinc-50/70 p-5 lg:border-b-0 lg:border-r lg:p-6">
-            <div className="flex h-full flex-col gap-4">
+        <div className="grid min-h-0 flex-1 grid-cols-1 lg:grid-cols-[minmax(0,1fr)_392px]">
+          <div className="min-h-0 overflow-hidden border-b border-zinc-200 bg-zinc-50/70 p-5 lg:border-b-0 lg:border-r lg:p-6">
+            <div className="flex h-full min-h-0 flex-col gap-4">
               <div className="flex items-center justify-between gap-4">
                 <div>
                   <h2 className="text-lg font-semibold">Atvaizdas</h2>
@@ -1383,7 +1403,7 @@ function App() {
                 </div>
               </div>
 
-              <div className="relative flex-1 overflow-hidden border border-zinc-300 bg-white">
+              <div className="relative h-[320px] shrink-0 overflow-hidden border border-zinc-300 bg-white sm:h-[360px] xl:h-[400px]">
                 <div
                   className="absolute inset-0 opacity-60"
                   style={{
@@ -1394,173 +1414,180 @@ function App() {
                 />
 
                 <div className="absolute inset-0 flex items-center justify-center p-2 sm:p-3">
-                  <div
-                    className="relative flex h-full w-full items-center justify-center"
-                  >
-
-                    <div className="flex h-full w-full flex-col items-center gap-5 px-2 text-center sm:px-4">
-                      <div ref={previewViewportRef} className="relative flex min-h-0 w-full flex-1 items-center justify-center self-stretch">
+                  <div className="flex h-full w-full min-h-0 items-center justify-center px-2 text-center sm:px-4">
+                    <div
+                      ref={previewViewportRef}
+                      className="relative flex min-h-0 w-full flex-1 items-center justify-center self-stretch"
+                      style={isHanging ? { paddingTop: `${previewRiggingHeightPx}px` } : undefined}
+                    >
                         <div className="relative" style={previewShapeStyle}>
-                          {hasCabinets && isHanging ? (
-                            <div
-                              className="pointer-events-none absolute inset-x-0 z-10"
-                              style={{ top: `-${previewRiggingHeightPx}px`, height: `${previewRiggingHeightPx}px` }}
-                            >
-                              {pointPreviewMarkers.map((point) => (
-                                <div
-                                  key={point.index}
-                                  className="absolute top-0 flex -translate-x-1/2 flex-col items-center gap-1"
-                                  style={{ left: `${point.labelPercent}%` }}
-                                >
-                                  <div className="flex h-5 min-w-5 items-center justify-center rounded-full bg-zinc-950 px-1 text-[10px] font-bold text-white shadow-sm ring-1 ring-white/70">
-                                    {point.index}
-                                  </div>
-                                  <div className="rounded bg-zinc-950/80 px-1 py-0.5 text-[9px] font-medium leading-none text-white ring-1 ring-white/20">
-                                    {point.loadKg.toFixed(1)} kg
-                                  </div>
-                                  <div className="h-8 w-px bg-zinc-900/65" />
+                        {hasCabinets && isHanging ? (
+                          <div
+                            className="pointer-events-none absolute inset-x-0 z-10"
+                            style={{ top: `-${previewRiggingHeightPx}px`, height: `${previewRiggingHeightPx}px` }}
+                          >
+                            {pointPreviewMarkers.map((point) => (
+                              <div
+                                key={point.index}
+                                className="absolute top-0 flex -translate-x-1/2 flex-col items-center gap-1"
+                                style={{ left: `${point.labelPercent}%` }}
+                              >
+                                <div className="flex h-5 min-w-5 items-center justify-center rounded-full bg-zinc-950 px-1 text-[10px] font-bold text-white shadow-sm ring-1 ring-white/70">
+                                  {point.index}
                                 </div>
-                              ))}
-
-                              {hasPreviewTruss ? (
-                                <div
-                                  className="absolute left-1/2 -translate-x-1/2"
-                                  style={{ top: 54, width: `${previewTrussWidthPercent}%` }}
-                                >
-                                  <svg
-                                    className="h-10 w-full overflow-visible"
-                                    viewBox={`0 0 ${previewTrussSvgWidthPx} 34`}
-                                    preserveAspectRatio="none"
-                                    aria-hidden="true"
-                                  >
-                                    <rect x="0" y="7" width={previewTrussSvgWidthPx} height="4" rx="1.5" fill="#d4d4d8" stroke="#3f3f46" strokeWidth="1" />
-                                    <rect x="0" y="23" width={previewTrussSvgWidthPx} height="4" rx="1.5" fill="#d4d4d8" stroke="#3f3f46" strokeWidth="1" />
-                                    {previewTrussNodeIndexes.map((nodeIndex) => {
-                                      const x = nodeIndex * previewTrussPanelWidthPx
-
-                                      return (
-                                        <line
-                                          key={`truss-node-${nodeIndex}`}
-                                          x1={x}
-                                          y1="9"
-                                          x2={x}
-                                          y2="25"
-                                          stroke="#52525b"
-                                          strokeWidth="1"
-                                        />
-                                      )
-                                    })}
-                                    {previewTrussSegmentIndexes.map((segmentIndex) => {
-                                      const startX = segmentIndex * previewTrussPanelWidthPx
-                                      const endX = (segmentIndex + 1) * previewTrussPanelWidthPx
-
-                                      return (
-                                        <g key={`truss-segment-${segmentIndex}`}>
-                                          <line
-                                            x1={startX}
-                                            y1={segmentIndex % 2 === 0 ? '25' : '9'}
-                                            x2={endX}
-                                            y2={segmentIndex % 2 === 0 ? '9' : '25'}
-                                            stroke="#71717a"
-                                            strokeWidth="1"
-                                          />
-                                          <line
-                                            x1={startX}
-                                            y1={segmentIndex % 2 === 0 ? '9' : '25'}
-                                            x2={endX}
-                                            y2={segmentIndex % 2 === 0 ? '25' : '9'}
-                                            stroke="#a1a1aa"
-                                            strokeOpacity="0.65"
-                                            strokeWidth="0.8"
-                                          />
-                                        </g>
-                                      )
-                                    })}
-                                  </svg>
+                                <div className="rounded bg-zinc-950/80 px-1 py-0.5 text-[9px] font-medium leading-none text-white ring-1 ring-white/20">
+                                  {point.loadKg.toFixed(1)} kg
                                 </div>
-                              ) : (
-                                <div className="absolute inset-x-[6%] top-[72px] h-[2px] rounded-full bg-zinc-500/70" />
-                              )}
+                                <div className="h-8 w-px bg-zinc-900/65" />
+                              </div>
+                            ))}
 
-                              {previewSteelflexMarkers.map((marker) => (
-                                <div
-                                  key={`steelflex-${marker.index}`}
-                                  className="absolute flex -translate-x-1/2 flex-col items-center"
-                                  style={{
-                                    left: `${marker.xPercent}%`,
-                                    top: hasPreviewTruss ? 82 : 74,
-                                    height: hasPreviewTruss ? 30 : 38,
-                                  }}
-                                >
-                                  <div className="h-2.5 w-2.5 rounded-full border border-zinc-700 bg-zinc-100 shadow-sm" />
-                                  <div className="mt-1 w-px flex-1 bg-zinc-500/80" />
-                                  <div className="h-2 w-2 rounded-full border border-zinc-700 bg-zinc-200/95" />
-                                </div>
-                              ))}
-                            </div>
-                          ) : null}
-                          <div className={`relative h-full w-full overflow-hidden border ${previewShapeClassName} transition-all duration-300`}>
-                            {hasCabinets ? (
-                              <div className="relative h-full w-full bg-black p-px">
-                                <div className="grid h-full w-full" style={previewModulesStyle}>
-                                  {Array.from({ length: totalCabinets }, (_, index) => {
-                                    const row = Math.floor(index / Math.max(cabinetsWide, 1))
-                                    const column = index % Math.max(cabinetsWide, 1)
-                                    const usesWarmPalette = isCurved || isHanging
-                                    const moduleAccentClassName = usesWarmPalette
-                                      ? (row + column) % 2 === 0
-                                        ? 'bg-orange-600'
-                                        : 'bg-violet-700'
-                                      : (row + column) % 2 === 0
-                                        ? 'bg-lime-500'
-                                        : 'bg-violet-900'
-
-                                    return (
-                                      <div
-                                        key={`${row}-${column}`}
-                                        className={`min-h-0 min-w-0 border border-white/75 ${moduleAccentClassName}`}
-                                      />
-                                    )
-                                  })}
-                                </div>
-
+                            {hasPreviewTruss ? (
+                              <div
+                                className="absolute left-1/2 -translate-x-1/2"
+                                style={{ top: 54, width: `${previewTrussWidthPercent}%` }}
+                              >
                                 <svg
-                                  className="pointer-events-none absolute inset-0 h-full w-full"
-                                  viewBox="0 0 100 100"
+                                  className="h-10 w-full overflow-visible"
+                                  viewBox={`0 0 ${previewTrussSvgWidthPx} 34`}
                                   preserveAspectRatio="none"
                                   aria-hidden="true"
                                 >
-                                  <line x1="0" y1="0" x2="100" y2="100" stroke={previewOverlayStroke} strokeWidth="0.22" />
-                                  <line x1="0" y1="100" x2="100" y2="0" stroke={previewOverlayStroke} strokeWidth="0.22" />
-                                  <circle cx="50" cy="50" r="24" fill="none" stroke={previewOverlayStroke} strokeWidth="0.18" />
-                                </svg>
+                                  <rect x="0" y="7" width={previewTrussSvgWidthPx} height="4" rx="1.5" fill="#d4d4d8" stroke="#3f3f46" strokeWidth="1" />
+                                  <rect x="0" y="23" width={previewTrussSvgWidthPx} height="4" rx="1.5" fill="#d4d4d8" stroke="#3f3f46" strokeWidth="1" />
+                                  {previewTrussNodeIndexes.map((nodeIndex) => {
+                                    const x = nodeIndex * previewTrussPanelWidthPx
 
-                                <div className={`pointer-events-none absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 px-2 py-1 text-center text-[10px] leading-tight ${previewOverlayLabelClassName}`}>
-                                  <div>{selectedModel?.name ?? 'Screen1'}</div>
-                                  <div>W {totalResX} X H {totalResY}</div>
-                                  <div>W {assembledWidthM.toFixed(2)}(m) X H {assembledHeightM.toFixed(2)}(m)</div>
-                                </div>
+                                    return (
+                                      <line
+                                        key={`truss-node-${nodeIndex}`}
+                                        x1={x}
+                                        y1="9"
+                                        x2={x}
+                                        y2="25"
+                                        stroke="#52525b"
+                                        strokeWidth="1"
+                                      />
+                                    )
+                                  })}
+                                  {previewTrussSegmentIndexes.map((segmentIndex) => {
+                                    const startX = segmentIndex * previewTrussPanelWidthPx
+                                    const endX = (segmentIndex + 1) * previewTrussPanelWidthPx
+
+                                    return (
+                                      <g key={`truss-segment-${segmentIndex}`}>
+                                        <line
+                                          x1={startX}
+                                          y1={segmentIndex % 2 === 0 ? '25' : '9'}
+                                          x2={endX}
+                                          y2={segmentIndex % 2 === 0 ? '9' : '25'}
+                                          stroke="#71717a"
+                                          strokeWidth="1"
+                                        />
+                                        <line
+                                          x1={startX}
+                                          y1={segmentIndex % 2 === 0 ? '9' : '25'}
+                                          x2={endX}
+                                          y2={segmentIndex % 2 === 0 ? '25' : '9'}
+                                          stroke="#a1a1aa"
+                                          strokeOpacity="0.65"
+                                          strokeWidth="0.8"
+                                        />
+                                      </g>
+                                    )
+                                  })}
+                                </svg>
                               </div>
-                            ) : null}
+                            ) : (
+                              <div className="absolute inset-x-[6%] top-[72px] h-[2px] rounded-full bg-zinc-500/70" />
+                            )}
+
+                            {previewSteelflexMarkers.map((marker) => (
+                              <div
+                                key={`steelflex-${marker.index}`}
+                                className="absolute flex -translate-x-1/2 flex-col items-center"
+                                style={{
+                                  left: `${marker.xPercent}%`,
+                                  top: hasPreviewTruss ? 82 : 74,
+                                  height: hasPreviewTruss ? 30 : 38,
+                                }}
+                              >
+                                <div className="h-2.5 w-2.5 rounded-full border border-zinc-700 bg-zinc-100 shadow-sm" />
+                                <div className="mt-1 w-px flex-1 bg-zinc-500/80" />
+                                <div className="h-2 w-2 rounded-full border border-zinc-700 bg-zinc-200/95" />
+                              </div>
+                            ))}
                           </div>
+                        ) : null}
+
+                        <div className={`relative h-full w-full overflow-hidden border ${previewShapeClassName} transition-all duration-300`}>
+                          {hasCabinets ? (
+                            <div className="relative h-full w-full bg-black p-px">
+                              <div className="grid h-full w-full" style={previewModulesStyle}>
+                                {Array.from({ length: totalCabinets }, (_, index) => {
+                                  const row = Math.floor(index / Math.max(cabinetsWide, 1))
+                                  const column = index % Math.max(cabinetsWide, 1)
+                                  const usesWarmPalette = isCurved || isHanging
+                                  const moduleAccentClassName = usesWarmPalette
+                                    ? (row + column) % 2 === 0
+                                      ? 'bg-orange-600'
+                                      : 'bg-violet-700'
+                                    : (row + column) % 2 === 0
+                                      ? 'bg-lime-500'
+                                      : 'bg-violet-900'
+
+                                  return (
+                                    <div
+                                      key={`${row}-${column}`}
+                                      className={`min-h-0 min-w-0 border border-white/75 ${moduleAccentClassName}`}
+                                    />
+                                  )
+                                })}
+                              </div>
+
+                              <svg
+                                className="pointer-events-none absolute inset-0 h-full w-full"
+                                viewBox="0 0 100 100"
+                                preserveAspectRatio="none"
+                                aria-hidden="true"
+                              >
+                                <line x1="0" y1="0" x2="100" y2="100" stroke={previewOverlayStroke} strokeWidth="0.22" />
+                                <line x1="0" y1="100" x2="100" y2="0" stroke={previewOverlayStroke} strokeWidth="0.22" />
+                                <circle cx="50" cy="50" r="24" fill="none" stroke={previewOverlayStroke} strokeWidth="0.18" />
+                              </svg>
+
+                              <div className={`pointer-events-none absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 px-2 py-1 text-center text-[10px] leading-tight ${previewOverlayLabelClassName}`}>
+                                <div>{selectedModel?.name ?? 'Screen1'}</div>
+                                <div>W {totalResX} X H {totalResY}</div>
+                                <div>W {assembledWidthM.toFixed(2)}(m) X H {assembledHeightM.toFixed(2)}(m)</div>
+                              </div>
+                            </div>
+                          ) : null}
                         </div>
+                      </div>
+
                         {selectedModel ? (
                           <div className="absolute -bottom-4 right-0 border border-zinc-300 bg-white px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.16em] text-zinc-600">
                             {selectedModel.depthM} m
                           </div>
                         ) : null}
-                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
 
-                      <div>
-                        <h3 className="text-2xl font-semibold tracking-tight">{selectedModel?.name ?? 'LED ekranas'}</h3>
-                        <p className="mt-2 text-sm leading-6 text-zinc-500">
-                          {hasCabinets
-                            ? 'Pasirinktas modelis rodo savo rezoliuciją, fizinius matmenis, svorį, galią ir lenkimo ribas.'
-                            : 'Įveskite modulių kiekį plotyje ir aukštyje, kad pamatytumėte skaičiavimą.'}
-                        </p>
-                      </div>
+              <div className="min-h-0 flex-1 overflow-hidden rounded-[2rem] border border-zinc-200 bg-white p-4 shadow-sm">
+                <div className="flex h-full flex-col gap-4 overflow-y-auto pr-1">
+                  <div className="border-b border-zinc-200 pb-4">
+                    <h3 className="text-2xl font-semibold tracking-tight">{selectedModel?.name ?? 'LED ekranas'}</h3>
+                    <p className="mt-2 text-sm leading-6 text-zinc-500">
+                      {hasCabinets
+                        ? 'Pasirinktas modelis rodo savo rezoliuciją, fizinius matmenis, svorį, galią ir lenkimo ribas.'
+                        : 'Įveskite modulių kiekį plotyje ir aukštyje, kad pamatytumėte skaičiavimą.'}
+                    </p>
+                  </div>
 
-                      <div className="w-full rounded-[1.8rem] border border-zinc-200 bg-zinc-50 p-4 shadow-sm">
+                  <div className="w-full rounded-[1.8rem] border border-zinc-200 bg-zinc-50 p-4 shadow-sm">
                         <div className="mb-3 flex items-center justify-between gap-3">
                           <div>
                             <div className="text-xs uppercase tracking-[0.18em] text-zinc-400">Skaičiavimo rezultatai</div>
@@ -1708,8 +1735,6 @@ function App() {
                             </div>
                           </div>
                         )}
-                      </div>
-                    </div>
                   </div>
                 </div>
               </div>
