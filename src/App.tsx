@@ -798,8 +798,10 @@ function App() {
     : 1
   const previewHorizontalInsetPx = 24
   const previewVerticalInsetPx = 24
+  const usesDenseRiggingPreview = isHanging && suspensionPointCount >= 5
+  const previewTranslateYPx = isHanging && !usesDenseRiggingPreview ? Math.round(previewRiggingHeightPx / 2) : 0
   const previewAvailableWidthPx = Math.max(previewViewportSize.width - previewHorizontalInsetPx * 2, 0)
-  const previewAvailableHeightPx = Math.max(previewViewportSize.height - previewRiggingHeightPx - previewVerticalInsetPx * 2, 0)
+  const previewAvailableHeightPx = Math.max(previewViewportSize.height - previewRiggingHeightPx - previewVerticalInsetPx * 2 - previewTranslateYPx, 0)
   const previewFrameSize = hasCabinets
     ? getContainedPreviewSize(
         previewAvailableWidthPx / previewContentWidthFactor,
@@ -810,7 +812,6 @@ function App() {
       )
     : { width: 0, height: 0 }
   const hasMeasuredPreviewFrameSize = previewFrameSize.width >= 24 && previewFrameSize.height >= 24
-  const usesDenseRiggingPreview = isHanging && suspensionPointCount >= 5
   const densePreviewScale = usesDenseRiggingPreview
     ? clamp(1 - (suspensionPointCount - 5) * 0.025, 0.8, 0.92)
     : 1
@@ -1118,7 +1119,7 @@ function App() {
     transform: hasCabinets && isHanging
       ? usesDenseRiggingPreview
         ? `scale(${densePreviewScale})`
-        : `translateY(${Math.round(previewRiggingHeightPx / 2)}px)`
+        : `translateY(${previewTranslateYPx}px)`
       : 'none',
     transformOrigin: hasCabinets && isHanging && usesDenseRiggingPreview ? 'top center' : undefined,
     opacity: hasCabinets ? (isTransparent ? 0.55 : 1) : 0,
