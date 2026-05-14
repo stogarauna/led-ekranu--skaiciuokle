@@ -118,6 +118,10 @@ export function hasDesktopUsersFileAccess() {
 }
 
 export function getInitialAuthStorageMode(): AuthStorageMode {
+  if (configuredAuthApiBaseUrl) {
+    return 'server'
+  }
+
   return isDesktopAuthAvailable() ? 'desktop' : 'local'
 }
 
@@ -126,7 +130,7 @@ export function isSharedAuthUnavailableError(error: unknown) {
 }
 
 export async function loginWithSharedAuth(username: string, password: string) {
-  if (isDesktopAuthAvailable()) {
+  if (!configuredAuthApiBaseUrl && isDesktopAuthAvailable()) {
     const response = await window.desktopApp.loginUser(username, password)
     return {
       ...response,
@@ -157,7 +161,7 @@ export async function loginWithSharedAuth(username: string, password: string) {
 }
 
 export async function loadSharedUsers(token?: string | null) {
-  if (isDesktopAuthAvailable()) {
+  if (!configuredAuthApiBaseUrl && isDesktopAuthAvailable()) {
     const response = await window.desktopApp.loadUsers()
     return {
       ...response,
@@ -182,7 +186,7 @@ export async function loadSharedUsers(token?: string | null) {
 }
 
 export async function createSharedUser(token: string | null | undefined, payload: { username: string; password: string; role: UserRole }) {
-  if (isDesktopAuthAvailable()) {
+  if (!configuredAuthApiBaseUrl && isDesktopAuthAvailable()) {
     const response = await window.desktopApp.createUser(payload)
     return {
       ...response,
@@ -208,7 +212,7 @@ export async function createSharedUser(token: string | null | undefined, payload
 }
 
 export async function deleteSharedUser(token: string | null | undefined, username: string) {
-  if (isDesktopAuthAvailable()) {
+  if (!configuredAuthApiBaseUrl && isDesktopAuthAvailable()) {
     const response = await window.desktopApp.deleteUser(username)
     return {
       ...response,

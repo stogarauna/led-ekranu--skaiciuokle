@@ -60,11 +60,26 @@ Jei `npm` arba `npx` blokuoja PowerShell vykdymo politika, naudokite `npm.cmd` v
 
 ## Vartotojų duomenų bazė
 
-- Desktop programoje vartotojai laikomi SQLite faile `users.db` vartotojo programos duomenų kataloge
-- Web režime privatus hostas turi paleisti `node server/auth-server.js`, o aktyvi vartotojų bazė pagal nutylėjimą bus `data/users.db`
+- Vartotojai laikomi SQLite bazėje render.com serveryje – autentikacija visada vyksta per serverį, nesvarbu ar programa desktop ar web
+- Jei `VITE_AUTH_API_BASE_URL` **nestatytas** build metu, Electron desktop programa naudoja vietinę SQLite bazę (offline/privataus naudojimo variantas)
 - Admin sukurti vartotojai saugomi SQLite lentelėje `users` su laukais `username`, `password_hash`, `role`
-- Prisijungimo duomenys tikrinami serveryje arba Electron pagrindiniame procese, ne vien naršyklės `localStorage`
+- Prisijungimo duomenys tikrinami serveryje, ne vien naršyklės `localStorage`
 - Jei randamas senesnis `users.csv`, pirmo paleidimo metu vartotojai automatiškai importuojami į SQLite bazę
+
+## Desktop build su centralizuotu auth serveriu
+
+```powershell
+# 1. Sukurkite .env.desktop failą
+copy .env.desktop.example .env.desktop
+
+# 2. Pakeiskite URL į tikrą render.com adresą
+# VITE_AUTH_API_BASE_URL=https://jūsų-app.onrender.com
+
+# 3. Sukurkite installer
+npm.cmd run installer:win:online
+```
+
+Kai `VITE_AUTH_API_BASE_URL` įrašytas – tiek web, tiek Electron naudoja tą patį render.com serverį.
 
 ## Privatam hostinimui
 

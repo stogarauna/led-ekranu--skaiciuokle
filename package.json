@@ -21,7 +21,10 @@
         "lint": "eslint .",
         "preview": "vite preview",
         "dist:win": "npm.cmd run build && npm.cmd run generate:icons && electron-builder --win dir",
-        "installer:win": "npm.cmd run dist:win && node electron/build-installer.cjs"
+        "dist:win:online": "npm.cmd run build:online && npm.cmd run generate:icons && electron-builder --win dir",
+        "installer:win": "npm.cmd run dist:win && node electron/build-installer.cjs",
+        "installer:win:online": "npm.cmd run dist:win:online && node electron/build-installer.cjs",
+        "build:online": "tsc -b && vite build --mode desktop"
     },
     "dependencies": {
         "html-to-image": "^1.11.13",
