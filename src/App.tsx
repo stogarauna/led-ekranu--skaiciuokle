@@ -1816,24 +1816,46 @@ function App() {
                             ) : null}
                           </>
                         ) : (
-                          <div className="grid w-full grid-cols-2 gap-3 text-left sm:grid-cols-4">
-                            <div className="rounded-2xl border border-zinc-200 bg-white p-3 shadow-sm">
-                              <div className="text-xs text-zinc-500">Dydis</div>
-                              <div className="mt-1 font-semibold">{formatMeters(assembledWidthM)} × {formatMeters(assembledHeightM)}</div>
+                          <>
+                            <div className="grid w-full grid-cols-2 gap-3 text-left sm:grid-cols-4">
+                              <div className="rounded-2xl border border-zinc-200 bg-white p-3 shadow-sm">
+                                <div className="text-xs text-zinc-500">Dydis</div>
+                                <div className="mt-1 font-semibold">{formatMeters(assembledWidthM)} × {formatMeters(assembledHeightM)}</div>
+                              </div>
+                              <div className="rounded-2xl border border-zinc-300 bg-zinc-100 p-3 shadow-sm">
+                                <div className="text-xs text-zinc-500">Svoris</div>
+                                <div className="mt-1 font-semibold">{(isHanging ? totalSupportedWeightKg : totalWeightKg).toFixed(1)} kg</div>
+                              </div>
+                              <div className="rounded-2xl border border-zinc-300 bg-zinc-100 p-3 shadow-sm">
+                                <div className="text-xs text-zinc-500">Galia</div>
+                                <div className="mt-1 font-semibold">{(totalPowerW / 1000).toFixed(2)} kW</div>
+                              </div>
+                              <div className="rounded-2xl border border-zinc-200 bg-white p-3 shadow-sm">
+                                <div className="text-xs text-zinc-500">Rezoliucija</div>
+                                <div className="mt-1 font-semibold">{totalResX} × {totalResY}</div>
+                              </div>
                             </div>
-                            <div className="rounded-2xl border border-zinc-300 bg-zinc-100 p-3 shadow-sm">
-                              <div className="text-xs text-zinc-500">Svoris</div>
-                              <div className="mt-1 font-semibold">{(isHanging ? totalSupportedWeightKg : totalWeightKg).toFixed(1)} kg</div>
-                            </div>
-                            <div className="rounded-2xl border border-zinc-300 bg-zinc-100 p-3 shadow-sm">
-                              <div className="text-xs text-zinc-500">Galia</div>
-                              <div className="mt-1 font-semibold">{(totalPowerW / 1000).toFixed(2)} kW</div>
-                            </div>
-                            <div className="rounded-2xl border border-zinc-200 bg-white p-3 shadow-sm">
-                              <div className="text-xs text-zinc-500">Rezoliucija</div>
-                              <div className="mt-1 font-semibold">{totalResX} × {totalResY}</div>
-                            </div>
-                          </div>
+                            {isHanging ? (
+                              <div className="mt-3 rounded-[1.5rem] border border-zinc-200 bg-white p-4 shadow-sm">
+                                <div className="flex items-center justify-between gap-3">
+                                  <div className="text-xs uppercase tracking-[0.16em] text-zinc-400">Apkrovos pagal taškus</div>
+                                  <div className="text-xs text-zinc-500">Bendras svoris: {totalSupportedWeightKg.toFixed(1)} kg</div>
+                                </div>
+                                <div className="mt-2 text-center text-[11px] leading-4 text-zinc-500">
+                                  {riggingDistributionNote}
+                                </div>
+                                <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-3 xl:grid-cols-4">
+                                  {pointLoadsKg.map((point) => (
+                                    <div key={point.index} className="flex items-center justify-between gap-2 rounded-xl border border-zinc-200 bg-zinc-50 px-3 py-2">
+                                      <div className="text-xs text-zinc-400">T{point.index}</div>
+                                      <div className="text-sm font-semibold text-zinc-800">{point.loadKg.toFixed(1)} kg</div>
+                                      <div className="text-xs text-zinc-500">{(point.factor * 100).toFixed(1)}%</div>
+                                    </div>
+                                  ))}
+                                </div>
+                              </div>
+                            ) : null}
+                          </>
                         )}
                   </div>
                 </div>
