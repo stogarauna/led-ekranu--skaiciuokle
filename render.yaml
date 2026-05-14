@@ -2,7 +2,7 @@ databases:
   - name: led-ekranu-users-db
     databaseName: led_ekranu_users
     user: led_ekranu_admin
-    plan: starter
+    plan: free
     region: frankfurt
     ipAllowList: []
 
