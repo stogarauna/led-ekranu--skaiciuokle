@@ -236,6 +236,32 @@ export async function deleteSharedUser(token: string | null | undefined, usernam
   }
 }
 
+export async function changeUserPassword(token: string | null | undefined, username: string, newPassword: string) {
+  if (!configuredAuthApiBaseUrl && isDesktopAuthAvailable()) {
+    const response = await window.desktopApp.changeUserPassword(username, newPassword)
+    return {
+      ...response,
+      mode: 'desktop' as const,
+    }
+  }
+
+  if (!shouldAttemptServerAuth()) {
+    throw createUnavailableError()
+  }
+
+  const response = await requestJson<SharedAuthPayload>(`/api/users/${encodeURIComponent(username)}/password`, {
+    method: 'PUT',
+    headers: buildAuthHeaders(token),
+    body: JSON.stringify({ password: newPassword }),
+  })
+
+  return {
+    users: response.users ?? [],
+    usersFilePath: response.usersFilePath ?? '',
+    mode: 'server' as const,
+  }
+}
+
 export async function openDesktopUsersFile() {
   if (!hasDesktopUsersFileAccess()) {
     throw createUnavailableError()

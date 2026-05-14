@@ -8,5 +8,6 @@ contextBridge.exposeInMainWorld('desktopApp', {
   loginUser: (username, password) => ipcRenderer.invoke('users:login', { username, password }),
   createUser: (payload) => ipcRenderer.invoke('users:create', payload),
   deleteUser: (username) => ipcRenderer.invoke('users:delete', username),
+  changeUserPassword: (username, password) => ipcRenderer.invoke('users:change-password', { username, password }),
   openUsersFile: () => ipcRenderer.invoke('users:open-file'),
 })

@@ -256,6 +256,37 @@ async function startElectronDesktop() {
     }
   })
 
+  ipcMain.handle('users:change-password', async (_event, payload) => {
+    const username = normalizeUsername(payload?.username)
+    const password = typeof payload?.password === 'string' ? payload.password : ''
+
+    if (!username) {
+      throw new Error('Įveskite vartotojo vardą.')
+    }
+
+    if (password.length < minimumPasswordLength) {
+      throw new Error(`Slaptažodis turi būti bent ${minimumPasswordLength} simbolių.`)
+    }
+
+    const { users } = await loadUsersFromDatabase(getUsersDatabasePath(app), getLegacyUsersCsvPath(app))
+    const targetUser = users.find((user) => user.username === username)
+
+    if (!targetUser) {
+      throw new Error('Nepavyko rasti pasirinkto vartotojo.')
+    }
+
+    const result = await saveUsersToDatabase(
+      getUsersDatabasePath(app),
+      users.map((user) => user.username === username ? { ...user, passwordHash: hashPassword(password) } : user),
+      getLegacyUsersCsvPath(app),
+    )
+
+    return {
+      users: sanitizeUsersForRenderer(result.users),
+      usersFilePath: result.usersFilePath,
+    }
+  })
+
   ipcMain.handle('users:open-file', async () => {
     const { usersFilePath } = await openUsersDatabase(getUsersDatabasePath(app), getLegacyUsersCsvPath(app))
     const openResult = await shell.openPath(usersFilePath)

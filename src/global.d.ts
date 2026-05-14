@@ -45,6 +45,7 @@ interface Window {
     loginUser: (username: string, password: string) => Promise<AuthLoginResponse>
     createUser: (payload: { username: string; password: string; role: 'admin' | 'user' }) => Promise<AuthUsersResponse>
     deleteUser: (username: string) => Promise<AuthUsersResponse>
+    changeUserPassword: (username: string, password: string) => Promise<AuthUsersResponse>
     openUsersFile: () => Promise<string>
   }
 }

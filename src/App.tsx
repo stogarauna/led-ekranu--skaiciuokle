@@ -2,6 +2,7 @@ import type { CSSProperties } from 'react'
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import bundledCsvText from '../data/led-models.csv?raw'
 import {
+  changeUserPassword,
   createSharedUser,
   deleteSharedUser,
   getInitialAuthStorageMode,
@@ -492,6 +493,9 @@ function App() {
   const [newUserRole, setNewUserRole] = useState<UserRole>('user')
   const [newUserError, setNewUserError] = useState('')
   const [newUserSuccess, setNewUserSuccess] = useState('')
+  const [changePasswordTarget, setChangePasswordTarget] = useState<string | null>(null)
+  const [changePasswordInput, setChangePasswordInput] = useState('')
+  const [changePasswordError, setChangePasswordError] = useState('')
   const [previewViewportSize, setPreviewViewportSize] = useState({ width: 0, height: 0 })
   const initialUsersRef = useRef<AppUser[] | null>(null)
 
@@ -1033,6 +1037,9 @@ function App() {
   }
 
   function handleDeleteUser(username: string) {
+    setChangePasswordTarget(null)
+    setChangePasswordInput('')
+    setChangePasswordError('')
     void (async () => {
     const normalizedUsername = normalizeUsername(username)
     const targetUser = users.find((user) => user.username === normalizedUsername)
@@ -1259,21 +1266,99 @@ function App() {
               .slice()
               .sort((leftUser, rightUser) => leftUser.username.localeCompare(rightUser.username))
               .map((user) => (
-                <div key={user.username} className="flex items-center justify-between gap-3 rounded-2xl border border-zinc-200 bg-zinc-50 px-4 py-3 shadow-sm">
-                  <div>
-                    <div className="text-sm font-semibold text-zinc-900">{user.username}</div>
-                    <div className="mt-1 text-xs uppercase tracking-[0.16em] text-zinc-400">
-                      {user.role}{resolvedActiveUser?.username === user.username ? ' • aktyvus' : ''}
+                <div key={user.username} className="space-y-1.5">
+                  <div className="flex items-center justify-between gap-3 rounded-2xl border border-zinc-200 bg-zinc-50 px-4 py-3 shadow-sm">
+                    <div>
+                      <div className="text-sm font-semibold text-zinc-900">{user.username}</div>
+                      <div className="mt-1 text-xs uppercase tracking-[0.16em] text-zinc-400">
+                        {user.role}{resolvedActiveUser?.username === user.username ? ' • aktyvus' : ''}
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        className={`rounded-xl border px-3 py-2 text-xs font-semibold transition ${
+                          changePasswordTarget === user.username
+                            ? 'border-zinc-400 bg-zinc-100 text-zinc-900'
+                            : 'border-zinc-200 text-zinc-700 hover:bg-zinc-100'
+                        }`}
+                        onClick={() => {
+                          if (changePasswordTarget === user.username) {
+                            setChangePasswordTarget(null)
+                          } else {
+                            setChangePasswordTarget(user.username)
+                            setChangePasswordInput('')
+                            setChangePasswordError('')
+                          }
+                        }}
+                      >
+                        Keisti slaptažodį
+                      </button>
+                      <button
+                        type="button"
+                        className="rounded-xl border border-red-200 px-3 py-2 text-xs font-semibold text-red-700 transition hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-50"
+                        onClick={() => handleDeleteUser(user.username)}
+                        disabled={resolvedActiveUser?.username === user.username}
+                      >
+                        Ištrinti
+                      </button>
                     </div>
                   </div>
-                  <button
-                    type="button"
-                    className="rounded-xl border border-red-200 px-3 py-2 text-xs font-semibold text-red-700 transition hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-50"
-                    onClick={() => handleDeleteUser(user.username)}
-                    disabled={resolvedActiveUser?.username === user.username}
-                  >
-                    Ištrinti
-                  </button>
+                  {changePasswordTarget === user.username && (
+                    <form
+                      className="flex flex-wrap items-center gap-2 rounded-2xl border border-zinc-200 bg-white px-4 py-3 shadow-sm"
+                      onSubmit={(e) => {
+                        e.preventDefault()
+                        void (async () => {
+                          const password = changePasswordInput.trim()
+                          if (password.length < 6) {
+                            setChangePasswordError('Slaptažodis turi būti bent 6 simbolių.')
+                            return
+                          }
+                          try {
+                            const response = await changeUserPassword(sessionToken, user.username, password)
+                            setUsers(response.users)
+                            setUsersFilePath(response.usersFilePath)
+                            setAuthStorageMode(response.mode)
+                            setChangePasswordTarget(null)
+                            setChangePasswordInput('')
+                            setChangePasswordError('')
+                            setNewUserSuccess(`Vartotojo „${user.username}“ slaptažodis pakeistas.`)
+                            setNewUserError('')
+                          } catch (error) {
+                            setChangePasswordError(getErrorMessage(error, 'Nepavyko pakeisti slaptažodžio.'))
+                          }
+                        })()
+                      }}
+                    >
+                      <input
+                        type="password"
+                        autoComplete="new-password"
+                        className="min-w-0 flex-1 rounded-xl border border-zinc-200 bg-zinc-50 px-3 py-2 text-sm text-zinc-900 outline-none transition focus:border-zinc-400 focus:bg-white"
+                        value={changePasswordInput}
+                        onChange={(e) => setChangePasswordInput(e.target.value)}
+                        placeholder="Naujas slaptažodis (min. 6 simboliai)"
+                      />
+                      {changePasswordError ? (
+                        <span className="text-xs text-red-600">{changePasswordError}</span>
+                      ) : null}
+                      <div className="flex gap-2">
+                        <button
+                          type="submit"
+                          className="rounded-xl bg-zinc-950 px-3 py-2 text-xs font-semibold text-white transition hover:bg-zinc-800"
+                        >
+                          Išsaugoti
+                        </button>
+                        <button
+                          type="button"
+                          className="rounded-xl border border-zinc-200 px-3 py-2 text-xs font-semibold text-zinc-700 transition hover:bg-zinc-100"
+                          onClick={() => { setChangePasswordTarget(null); setChangePasswordError('') }}
+                        >
+                          Atšaukti
+                        </button>
+                      </div>
+                    </form>
+                  )}
                 </div>
               ))}
           </div>

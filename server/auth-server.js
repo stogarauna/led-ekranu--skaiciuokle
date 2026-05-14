@@ -334,6 +334,44 @@ const server = http.createServer(async (request, response) => {
       return
     }
 
+    const changePasswordMatch = requestUrl.pathname.match(/^\/api\/users\/([^/]+)\/password$/)
+
+    if (changePasswordMatch && request.method === 'PUT') {
+      const adminContext = await requireAdmin(request, response)
+
+      if (!adminContext) {
+        return
+      }
+
+      const username = normalizeUsername(decodeURIComponent(changePasswordMatch[1]))
+      const body = await readJsonBody(request)
+      const password = typeof body.password === 'string' ? body.password : ''
+
+      if (password.length < minimumPasswordLength) {
+        sendJson(response, 400, { message: `Slaptažodis turi būti bent ${minimumPasswordLength} simbolių.` })
+        return
+      }
+
+      const targetUser = adminContext.users.find((user) => user.username === username)
+
+      if (!targetUser) {
+        sendJson(response, 404, { message: 'Nepavyko rasti pasirinkto vartotojo.' })
+        return
+      }
+
+      const updatedUsers = adminContext.users.map((user) =>
+        user.username === username ? { ...user, passwordHash: hashPassword(password) } : user,
+      )
+
+      const { users } = await saveUsersToDatabase(usersFilePath, updatedUsers, legacyUsersCsvPath)
+
+      sendJson(response, 200, {
+        users: users.map(toClientUser),
+        usersFilePath,
+      })
+      return
+    }
+
     if (await tryServeStaticRequest(requestUrl, response, request.method || 'GET')) {
       return
     }
