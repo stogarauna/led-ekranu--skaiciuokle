@@ -74,7 +74,7 @@ function parseCsvLine(line) {
   return values
 }
 
-function sanitizeUsers(users) {
+export function sanitizeUsers(users) {
   const normalizedUsers = []
   const seenUsernames = new Set()
 

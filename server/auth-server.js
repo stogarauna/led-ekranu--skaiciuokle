@@ -6,12 +6,14 @@ import { URL } from 'node:url'
 import {
   hashPassword,
   isValidRole,
-  loadUsersFromDatabase,
   minimumPasswordLength,
   normalizeUsername,
-  saveUsersToDatabase,
   verifyPassword,
 } from '../electron/user-store.js'
+
+const { loadUsersFromDatabase, saveUsersToDatabase } = process.env.DATABASE_URL
+  ? await import('./pg-user-store.js')
+  : await import('../electron/user-store.js')
 
 const resolvedPort = Number.parseInt(process.env.PORT ?? process.env.AUTH_SERVER_PORT ?? '3001', 10)
 const port = Number.isFinite(resolvedPort) ? resolvedPort : 3001

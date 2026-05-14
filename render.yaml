@@ -1,3 +1,11 @@
+databases:
+  - name: led-ekranu-users-db
+    databaseName: led_ekranu_users
+    user: led_ekranu_admin
+    plan: starter
+    region: frankfurt
+    ipAllowList: []
+
 services:
   - type: web
     name: led-ekranu-skaiciuokle
@@ -13,13 +21,9 @@ services:
         value: production
       - key: AUTH_SERVER_HOST
         value: 0.0.0.0
-      - key: USERS_DB_PATH
-        value: /opt/render/project/src/data/users.db
-      - key: LEGACY_USERS_CSV_PATH
-        value: /opt/render/project/src/data/users.csv
       - key: AUTH_TOKEN_SECRET
         generateValue: true
-    disk:
-      name: led-data
-      mountPath: /opt/render/project/src/data
-      sizeGB: 5
+      - key: DATABASE_URL
+        fromDatabase:
+          name: led-ekranu-users-db
+          property: connectionString
