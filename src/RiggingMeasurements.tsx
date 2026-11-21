@@ -3,7 +3,6 @@ import { useEffect, useRef, useState } from 'react'
 type Pt = { id: number; x: number; y: number; label: string; group: string; kind: 'K' | 'M' }
 type Segment = { a: Pt; b: Pt; group: string; number: number }
 const numberText = (n: number) => Math.round(n).toLocaleString('lt-LT')
-const meters = (n: number) => n.toFixed(3).replace('.', ',')
 const unique = (pts: Pt[]) => [...new Set(pts.map(p => p.group))]
 function linesFor(pts: Pt[]): Segment[] {
   let n = 0
