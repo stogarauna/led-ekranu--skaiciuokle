@@ -1,4 +1,5 @@
 import type { CSSProperties } from 'react'
+import RiggingMeasurements from './RiggingMeasurements'
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import bundledCsvText from '../data/led-models.csv?raw'
 import {
@@ -487,6 +488,7 @@ function App() {
   const [users, setUsers] = useState<AppUser[]>(() => loadStoredUsers())
   const [activeUser, setActiveUser] = useState<AppUser | null>(null)
   const [activeAdminView, setActiveAdminView] = useState<AdminView>('calculator')
+  const [riggingView, setRiggingView] = useState(false)
   const [hasCompletedUserMigration, setHasCompletedUserMigration] = useState(false)
   const [newUsernameInput, setNewUsernameInput] = useState('')
   const [newPasswordInput, setNewPasswordInput] = useState('')
@@ -1458,19 +1460,22 @@ function App() {
                   {isAdmin ? 'Administravimo ir skaičiavimo langas' : 'Vartotojo peržiūros ir skaičiavimo langas'}
                 </p>
               </div>
+              <button type="button" onClick={() => setRiggingView(v => !v)} className={`rounded-xl border border-zinc-200 px-4 py-2 text-sm font-semibold ${riggingView ? 'bg-teal-700 text-white' : 'bg-white text-zinc-800 hover:bg-zinc-100'}`}>
+                {riggingView ? 'Grįžti į skaičiuoklę' : 'Pakabinimo taškai'}
+              </button>
               {isAdmin ? (
                 <div className="flex items-center gap-2 rounded-2xl border border-zinc-200 bg-white p-1 shadow-sm">
                   <button
                     type="button"
                     className={`rounded-xl px-3 py-2 text-sm font-medium transition ${resolvedActiveAdminView === 'calculator' ? 'bg-zinc-950 text-white' : 'text-zinc-600 hover:bg-zinc-100'}`}
-                    onClick={() => setActiveAdminView('calculator')}
+                    onClick={() => { setActiveAdminView('calculator'); setRiggingView(false) }}
                   >
                     Skaičiuoklė
                   </button>
                   <button
                     type="button"
                     className={`rounded-xl px-3 py-2 text-sm font-medium transition ${resolvedActiveAdminView === 'users' ? 'bg-zinc-950 text-white' : 'text-zinc-600 hover:bg-zinc-100'}`}
-                    onClick={() => setActiveAdminView('users')}
+                    onClick={() => { setActiveAdminView('users'); setRiggingView(false) }}
                   >
                     Vartotojai
                   </button>
@@ -1488,7 +1493,9 @@ function App() {
           </div>
         </div>
 
-        {isUsersPage ? (
+        {riggingView ? (
+          <div className="min-h-0 flex-1 overflow-y-auto bg-zinc-50/70 p-5 lg:p-6"><RiggingMeasurements /></div>
+        ) : isUsersPage ? (
           <div className="min-h-0 flex-1 overflow-y-auto bg-zinc-50/70 p-5 lg:p-6">
             {userManagementSection}
           </div>
